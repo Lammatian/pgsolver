@@ -54,4 +54,5 @@ let _ =
     Switch_random.register ();
     Switch_snare.register ();
     Switch_zadeh.register ();
-    Succinctsmallprogress.register ();;
+    Succinctsmallprogress.register ();
+    Sspm.register ();;
