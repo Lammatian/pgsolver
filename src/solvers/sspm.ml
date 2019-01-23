@@ -42,13 +42,19 @@ module BString = struct
       bstr
 
   let cut = function
+    (** TODO: Check if this works lol **)
     | Empty -> Empty
-    | BString arr as bstring->
+    | BString arr as bstring ->
       let last_one = ref ((length bstring) - 1) in
       while arr.(!last_one) do
         last_one := !last_one - 1
       done;
       BString (Array.sub arr 0 !last_one)
+
+  let is_max = function
+    | Empty -> false (** TODO: Check if correct **)
+    | BString arr ->
+      Array.for_all (fun x -> x) arr
 
   let compare bstr1 bstr2 =
     match bstr1, bstr2 with
@@ -70,18 +76,39 @@ end
 module AdaptiveCounter = struct
   type t = ACounter of BString.t array | Top
 
+  let d = ref 0
+
+  let set_d x =
+    if x mod 2 <> 0 then failwith "Value of d should be even" else
+    d := x
+
+  let empty = ACounter [||]
+
   let create list = ACounter (Array.of_list list)
 
-  let createTop () = Top
+  let createTop = Top
 
   let length = function
-    | Top -> failwith "Length called on Top Adaptive Counter"
+    | Top -> failwith "length called on AdaptiveCounter.Top"
     | ACounter arr -> Array.length arr
 
+  let lengthBS = function
+    | Top -> failwith "lengthBS called on AdaptiveCounter.Top"
+    | ACounter arr -> Array.fold_left (fun acc x -> acc + BString.length x) 0 arr
+
+  let last_index ac = (!d - 1) - 2 * (length ac - 1)
+
   let trim ac n =
+    (** TODO: Test this **)
     match ac with
     | Top -> Top
-    | ACounter arr -> ACounter (Array.sub arr 0 (Array.length arr - n))
+    | ACounter arr ->
+      let last_idx = last_index ac in
+      if last_idx >= n then ac
+      else 
+        let to_remove = (float_of_int n -. float_of_int last_idx) /. 2. |> ceil |> int_of_float in
+        let new_arr = Array.sub arr 0 (Array.length arr - to_remove) in
+        ACounter new_arr
 
   let compare ac1 ac2 =
     match ac1, ac2 with
@@ -99,12 +126,32 @@ module AdaptiveCounter = struct
 
   let append ac bstr = 
     match ac with
-    | Top -> failwith "Append called on Top Adaptive Counter"
+    | Top -> failwith "append called on AdaptiveCounter.Top"
     | ACounter arr -> ACounter (Array.append arr [|bstr|])
 
   let getLast = function
-    | Top -> failwith "GetLast called on Top Adaptive Counter"
+    | Top -> failwith "getLast called on AdaptiveCounter.Top"
     | ACounter arr -> arr.(Array.length arr - 1)
+
+  let trim_to_last_nonempty = function
+    (** TODO: Test if this works lol **)
+    | Top -> failwith "trim_to_last_nonempty called on AdaptiveCounter.Top"
+    | ACounter arr -> 
+      let i = ref (Array.length arr - 1) in
+      let ret = ref false in
+      while not !ret && !i >= 0 do
+        match arr.(!i) with
+        | Empty -> i := !i - 1
+        | BString _ -> ret := true
+      done;
+      ACounter (Array.sub arr 0 (!i + 1))
+
+  let set ac n bstr =
+    match ac with
+    | Top -> failwith "set called on AdaptiveCounter.Top"
+    | ACounter arr ->
+      if Array.length arr <= n then failwith "index out of bounds"
+      else arr.(n) <- bstr
 
   let isMax = function
     | Top -> true
@@ -124,12 +171,77 @@ module AdaptiveCounter = struct
   let print ac = show ac |> print_string
 end
 
+(** Helper function since OCaml is poor **)
+let log2 x = log10 x /. log10 2.
+
 module ProgressMeasure = struct
   type t = (Paritygame.node, AdaptiveCounter.t) Hashtbl.t
 
-  let create nodes = Hashtbl.create (Paritygame.ns_size nodes)
+  let d = ref 0
 
-  let lift pm node = ()
+  let mu = ref 0
+
+  let create pg nodes = 
+    let maxPriority = Paritygame.ns_max nodes 
+      (fun n1 n2 -> Paritygame.pg_get_priority pg n1 > Paritygame.pg_get_priority pg n2)
+    in
+    d := if maxPriority mod 2 = 0 then maxPriority else maxPriority + 1;
+    mu := Paritygame.pg_get_selected_priorities pg (fun x -> x mod 2 = 1) |> List.length;
+    Hashtbl.create (Paritygame.ns_size nodes)
+
+  let lift_ pm pg node neighbour =
+    (** TODO: What if neighbourAC is top **)
+    (** Page 14-15 of the paper **)
+    let module AC = AdaptiveCounter in
+    let module BS = BString in
+    let neighbourAC = Hashtbl.find pm neighbour in
+    let k = AC.last_index neighbourAC in
+    let p = Paritygame.pg_get_priority pg node in
+    let trimmedNAC = AC.trim neighbourAC p in
+    if p mod 2 = 0 then
+      trimmedNAC
+    else 
+    let clog_mu = float_of_int !mu |> log2 |> ceil |> int_of_float in
+    if k > p then (** Append 0s to the total max length **)
+      (** TODO: Check if this works lol **)
+      let toAppend = clog_mu - AC.lengthBS neighbourAC in
+      let appendedBS = BS.createLen toAppend in
+      AC.append neighbourAC appendedBS
+    else if AC.lengthBS trimmedNAC < clog_mu then
+      let last_elt = AC.getLast trimmedNAC in
+      (** TODO: Check this: wrong interpretation of append **)
+      let extension_len = clog_mu - AC.lengthBS trimmedNAC in
+      let extended_last = BS.append last_elt extension_len in
+      AC.set trimmedNAC (AC.length trimmedNAC) extended_last;
+      trimmedNAC
+    else
+    let trimmed_to_nonempty = AC.trim_to_last_nonempty trimmedNAC in
+    let last_in_trimmed = AC.getLast trimmed_to_nonempty in
+    if not (BS.is_max last_in_trimmed) then
+      let cut_last = BS.cut last_in_trimmed in
+      AC.set trimmed_to_nonempty (AC.length trimmed_to_nonempty - 1) cut_last;
+      trimmed_to_nonempty
+    else if AC.length trimmed_to_nonempty > 1 then
+      (** Remove last and set the second to last appropriately **)
+      let extension_len = AC.getLast trimmed_to_nonempty |> BS.length in
+      AC.set trimmed_to_nonempty (AC.length trimmed_to_nonempty - 1) (BS.create []);
+      let new_trimmed = AC.trim_to_last_nonempty trimmed_to_nonempty in
+      let last_in_trimmed = AC.getLast new_trimmed in
+      let extended_last = BS.append last_in_trimmed extension_len in
+      AC.set new_trimmed (AC.length new_trimmed - 1) extended_last;
+      new_trimmed
+    else
+      AC.Top
+
+  let lift pm pg node =
+    let neighbours = Paritygame.pg_get_successors pg node |> Paritygame.ns_nodes in
+    let newAC = 
+    if Paritygame.pg_get_owner pg node = Paritygame.plr_Even then (** Minimum **)
+    List.fold_left (fun acc x -> min acc (lift_ pm pg node x)) AdaptiveCounter.Top neighbours
+    else (** Maximum **)
+    List.fold_left (fun acc x -> max acc (lift_ pm pg node x)) AdaptiveCounter.empty neighbours
+    in
+    Hashtbl.add pm node newAC
 
   let getAC pm node = Hashtbl.find pm node
 
@@ -138,7 +250,9 @@ module ProgressMeasure = struct
   let getWinningStrategy pm = Paritygame.str_make 0
 end
 
-
+(** At start, get all non-progressive **)
+(** Then do lift on non-progressive until all progressive **)
+(** Requires progressiveness check **)
 let solve (game : Paritygame.paritygame) = (sol_make 0, str_make 0)
 
 let register () =

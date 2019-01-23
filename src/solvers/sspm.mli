@@ -1,8 +1,4 @@
-(*open Paritygame
-
-val solve : paritygame -> solution * strategy
-val register : unit -> unit
-*)
+(** TODO: Consistency in underscore_naming you dumb fuck **)
 
 val solve : Paritygame.paritygame -> Paritygame.solution * Paritygame.strategy
 val register: unit -> unit
@@ -17,12 +13,14 @@ module BString : sig
   val show      : t -> string
   (** Prints the BString to the standard output **)
   val print     : t -> unit
+  (** Get the length of the bstring **)
+  val length    : t -> int
   (** Appends 10...0 to a total length of the second argument **)
   val append    : t -> int -> t
   (** Cut the last 01...1 from the BString **)
   val cut       : t -> t
-  (** Get the length of the bstring **)
-  val length    : t -> int
+  (** Check if BString is maximal of its length (i.e. only 1s) **)
+  val is_max    : t -> bool
   (** Compare two BStrings with each other, returning
       -1 if first is smaller, 0 if they're equal and
       1 if first is bigger than the second one **)
@@ -31,38 +29,63 @@ end
 
 module AdaptiveCounter : sig
   type t
+  (** Smallest even number not smaller than any priority
+      in our parity game **)
+  val d          : int ref
+  (** Set the value of d **)
+  val set_d      : int -> unit
+  (** Empty AdaptiveCounter (smallest possible) **)
+  val empty      : t
   (** Create AdaptiveCounter from list of BStrings **)
-  val create    : BString.t list -> t
+  val create     : BString.t list -> t
   (** Create Top AdaptiveCounter **)
-  val createTop : unit -> t
+  val createTop  : t
   (** Get length of the AdaptiveCounter defined as
       the number of BStrings inside it **)
-  val length    : t -> int
-  (** Trim the AdaptiveCounter of the last n entries **)
-  val trim      : t -> int -> t
+  val length     : t -> int
+  (** Get the total length of all BStrings inside the
+      AdaptiveCounter **)
+  val lengthBS   : t -> int
+  (** Get last index of the given AdaptiveCounter counted
+      as in the paper **)
+  val last_index : t -> int
+  (** Trim the AdaptiveCounter given a priority **)
+  val trim       : t -> int -> t
   (** Compare two AdaptiveCounters with each other,
       returning -1 if first is smaller, 0 if they're
       equal and 1 if the first is bigger **)
-  val compare   : t -> t -> int
+  val compare    : t -> t -> int
   (** Append a BString to the end of the AdaptiveCounter **)
-  val append    : t -> BString.t -> t
+  val append     : t -> BString.t -> t
   (** Get last item of the AdaptiveCounter **)
-  val getLast   : t -> BString.t
+  val getLast    : t -> BString.t
+  (** Trim the AdaptiveCounter to last non-empty BString **)
+  val trim_to_last_nonempty : t -> t
+  (** Set the BString at specified index **)
+  val set        : t -> int -> BString.t -> unit
   (** Determine if the AdaptiveCounter is the top element **)
-  val isMax     : t -> bool
+  val isMax      : t -> bool
   (** Returns the string representation of the AdaptiveCounter **)
-  val show      : t -> string
+  val show       : t -> string
   (** Prints the BString to the standard output **)
-  val print     : t -> unit
+  val print      : t -> unit
 end
 
 module ProgressMeasure : sig
   type t
-  (** Create ProgressMeasure mapping all nodes to
-      the lowest possible AdaptiveCounter **)
-  val create             : Paritygame.nodeset -> t
+  (** Smallest even value greater than or equal to the
+      max priority in the game **)
+  val d : int ref
+  (** Number of nodes with odd priority **)
+  val mu : int ref
+  (** Create ProgressMeasure mapping all nodes to the
+      lowest possible AdaptiveCounter **)
+  val create             : Paritygame.paritygame -> Paritygame.nodeset -> t
   (** Lift method for making the given node progressive **)
-  val lift               : t -> Paritygame.node -> unit
+  val lift               : t -> Paritygame.paritygame -> Paritygame.node -> unit
+  (** Helper lift method for determining the smallest
+      AdaptiveCounter making the edge progressive **)
+  val lift_              : t -> Paritygame.paritygame -> Paritygame.node -> Paritygame.node -> AdaptiveCounter.t
   (** Get AdaptiveCounter for the given node **)
   val getAC              : t -> Paritygame.node -> AdaptiveCounter.t
   (** Get the winning set for the given ProgressMeasure **)
