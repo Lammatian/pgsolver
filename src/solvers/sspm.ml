@@ -1,4 +1,9 @@
+open Basics;;
 open Paritygame;;
+
+let log_debug msg = message_autotagged 3 (fun _ -> "SSMP") (fun _ -> msg ^ "\n") ;;
+let log_verb msg = message_autotagged 2 (fun _ -> "SSMP") (fun _ -> msg ^ "\n") ;;
+let log_info msg = message_autotagged 2 (fun _ -> "SSMP") (fun _ -> msg ^ "\n") ;;
 
 module BString = struct
   type t = BString of bool array | Empty
@@ -41,15 +46,19 @@ module BString = struct
     else
       bstr
 
-  let cut = function
+  let cut bstr =
     (** TODO: Check if this works lol **)
+    log_info ("Calling cut on BString " ^ show bstr);
+    match bstr with
     | Empty -> Empty
     | BString arr as bstring ->
       let last_one = ref ((length bstring) - 1) in
       while arr.(!last_one) do
         last_one := !last_one - 1
       done;
-      BString (Array.sub arr 0 !last_one)
+      let new_arr = Array.sub arr 0 !last_one in
+      if Array.length new_arr = 0 then Empty
+      else BString (Array.sub arr 0 !last_one)
 
   let is_max = function
     | Empty -> false (** TODO: Check if correct **)
@@ -88,6 +97,19 @@ module AdaptiveCounter = struct
 
   let createTop = Top
 
+  let show = function
+    | Top -> "T"
+    | ACounter arr ->
+      let list = Array.to_list arr in
+      let rec loop = function
+        | [] -> ""
+        | [x] -> BString.show x
+        | hd :: tl -> BString.show hd ^ "," ^ loop tl
+      in
+      "(" ^ loop list ^ ")"
+
+  let print ac = show ac |> print_string
+
   let length = function
     | Top -> failwith "length called on AdaptiveCounter.Top"
     | ACounter arr -> Array.length arr
@@ -100,9 +122,11 @@ module AdaptiveCounter = struct
 
   let trim ac n =
     (** TODO: Test this **)
+    log_info ("Calling trim on " ^ show ac ^ " with π(n) = " ^ string_of_int n);
     match ac with
     | Top -> Top
     | ACounter arr ->
+      if Array.length arr = 0 then ACounter arr else
       let last_idx = last_index ac in
       if last_idx >= n then ac
       else 
@@ -122,7 +146,15 @@ module AdaptiveCounter = struct
       ret := BString.compare arr1.(!i) arr2.(!i);
       i := !i + 1
     done;
-    !ret
+    if !ret = 0 && length ac1 < length ac2 then -1
+    else if !ret = 0 && length ac1 > length ac2 then 1
+    else !ret
+
+  let max ac1 ac2 =
+    if compare ac1 ac2 > 0 then ac1 else ac2
+
+  let min ac1 ac2 =
+    if compare ac1 ac2 < 0 then ac1 else ac2
 
   let append ac bstr = 
     match ac with
@@ -133,7 +165,9 @@ module AdaptiveCounter = struct
     | Top -> failwith "getLast called on AdaptiveCounter.Top"
     | ACounter arr -> arr.(Array.length arr - 1)
 
-  let trim_to_last_nonempty = function
+  let trim_to_last_nonempty ac =
+    log_info "Calling trim_to_last_nonempty";
+    match ac with
     (** TODO: Test if this works lol **)
     | Top -> failwith "trim_to_last_nonempty called on AdaptiveCounter.Top"
     | ACounter arr -> 
@@ -156,19 +190,6 @@ module AdaptiveCounter = struct
   let isMax = function
     | Top -> true
     | ACounter _ -> false
-
-  let show = function
-    | Top -> "T"
-    | ACounter arr ->
-      let list = Array.to_list arr in
-      let rec loop = function
-        | [] -> ""
-        | [x] -> BString.show x
-        | hd :: tl -> BString.show hd ^ "," ^ loop tl
-      in
-      "(" ^ loop list ^ ")"
-
-  let print ac = show ac |> print_string
 end
 
 (** Helper function since OCaml is poor **)
@@ -181,46 +202,75 @@ module ProgressMeasure = struct
 
   let mu = ref 0
 
+  let size = Hashtbl.length
+
+  let show pm =
+    Hashtbl.fold (fun node ac acc -> acc ^ "Node " ^ Paritygame.nd_show node ^ " has AC " ^ AdaptiveCounter.show ac ^ "\n") pm ""
+
   let create pg nodes = 
-    let maxPriority = Paritygame.ns_max nodes 
-      (fun n1 n2 -> Paritygame.pg_get_priority pg n1 > Paritygame.pg_get_priority pg n2)
+    log_debug "Creating ProgressMeasure";
+    let maxPriority = Paritygame.ns_fold 
+      (fun acc node -> max acc (Paritygame.pg_get_priority pg node)) 0 nodes
     in
+    log_debug ("Highest priority found: " ^ string_of_int maxPriority);
     d := if maxPriority mod 2 = 0 then maxPriority else maxPriority + 1;
+    (** Set d in the AdaptiveCounter as well **)
+    AdaptiveCounter.set_d !d;
     mu := Paritygame.pg_get_selected_priorities pg (fun x -> x mod 2 = 1) |> List.length;
     let ht = Hashtbl.create (Paritygame.ns_size nodes) in
     Paritygame.ns_iter (fun node -> Hashtbl.add ht node AdaptiveCounter.empty) nodes;
+    log_debug ("Size of the hashtable: " ^ (string_of_int (Hashtbl.length ht)));
     ht
 
   let lift_ pm pg node neighbour =
     (** TODO: What if neighbourAC is top **)
     (** Page 14-15 of the paper **)
+    log_debug ("Calling lift_ on the edge (" ^ nd_show node ^ "," ^ nd_show neighbour ^ ")");
     let module AC = AdaptiveCounter in
     let module BS = BString in
     let neighbourAC = Hashtbl.find pm neighbour in
+    log_debug ("Neighbour's AC: " ^ AC.show neighbourAC);
     let k = AC.last_index neighbourAC in
     let p = Paritygame.pg_get_priority pg node in
     let trimmedNAC = AC.trim neighbourAC p in
+    log_debug ("Neighbour's trimmed AC: " ^ AC.show trimmedNAC);
     if p mod 2 = 0 then
-      trimmedNAC
+    begin
+      let ret = AC.max trimmedNAC (Hashtbl.find pm node) in
+      log_debug ("Even priority, returning max: " ^ AC.show ret);
+      (** TODO: Check this but should be fine as trimmedNAC
+          is minimum required for it to be progressive **)
+      ret
+    end
     else 
     let clog_mu = float_of_int !mu |> log2 |> ceil |> int_of_float in
+    log_debug ("Value of k is " ^ string_of_int k);
     if k > p then (** Append 0s to the total max length **)
+    begin      
+      log_debug "k is greater than priority, appending zeros";
       (** TODO: Check if this works lol **)
       let toAppend = clog_mu - AC.lengthBS neighbourAC in
       let appendedBS = BS.createLen toAppend in
       AC.append neighbourAC appendedBS
+    end
     else if AC.lengthBS trimmedNAC < clog_mu then
+    begin
+      log_debug "AdaptiveCounter not fully filled in, filling in";
       let last_elt = AC.getLast trimmedNAC in
       (** TODO: Check this: wrong interpretation of append **)
       let extension_len = clog_mu - AC.lengthBS trimmedNAC in
       let extended_last = BS.append last_elt extension_len in
       AC.set trimmedNAC (AC.length trimmedNAC) extended_last;
       trimmedNAC
+    end
     else
     let trimmed_to_nonempty = AC.trim_to_last_nonempty trimmedNAC in
+    log_debug ("Trimmed to non-empty: " ^ AC.show trimmed_to_nonempty);
     let last_in_trimmed = AC.getLast trimmed_to_nonempty in
+    log_debug ("Last in trimmed: " ^ BS.show last_in_trimmed);
     if not (BS.is_max last_in_trimmed) then
       let cut_last = BS.cut last_in_trimmed in
+      log_debug ("BString after cut: " ^ BS.show cut_last);
       AC.set trimmed_to_nonempty (AC.length trimmed_to_nonempty - 1) cut_last;
       trimmed_to_nonempty
     else if AC.length trimmed_to_nonempty > 1 then
@@ -236,14 +286,18 @@ module ProgressMeasure = struct
       AC.Top
 
   let lift pm pg node =
-    let neighbours = Paritygame.pg_get_successors pg node |> Paritygame.ns_nodes in
+    let module AC = AdaptiveCounter in
+    let module PG = Paritygame in
+    log_debug ("Calling lift on node " ^ nd_show node);
+    let neighbours = PG.pg_get_successors pg node |> PG.ns_nodes in
     let newAC = 
-    if Paritygame.pg_get_owner pg node = Paritygame.plr_Even then (** Minimum **)
-    List.fold_left (fun acc x -> min acc (lift_ pm pg node x)) AdaptiveCounter.Top neighbours
+    if PG.pg_get_owner pg node = PG.plr_Even then (** Minimum **)
+      List.fold_left (fun acc x -> AC.min acc (lift_ pm pg node x)) AC.Top neighbours
     else (** Maximum **)
-    List.fold_left (fun acc x -> max acc (lift_ pm pg node x)) AdaptiveCounter.empty neighbours
+      List.fold_left (fun acc x -> AC.max acc (lift_ pm pg node x)) AC.empty neighbours
     in
-    Hashtbl.add pm node newAC
+    log_debug ("New AC for that node is " ^ AC.show newAC);
+    Hashtbl.replace pm node newAC
 
   let getAC pm node = Hashtbl.find pm node
 
@@ -260,8 +314,8 @@ module ProgressMeasure = struct
       let p = Paritygame.pg_get_priority pg n1 in
       let trimmed_ac1 = AdaptiveCounter.trim ac1 p in
       let trimmed_ac2 = AdaptiveCounter.trim ac2 p in
-      if p mod 2 = 0 then trimmed_ac1 >= trimmed_ac2
-      else trimmed_ac1 > trimmed_ac2
+      if p mod 2 = 0 then AdaptiveCounter.compare trimmed_ac1 trimmed_ac2 >= 0
+      else AdaptiveCounter.compare trimmed_ac1 trimmed_ac2 > 0
     else 
       failwith "Non-existing edge cannot be progressive"
 
@@ -288,20 +342,26 @@ let solve (pg : Paritygame.paritygame) =
   PG.ns_iter (fun node -> if not (PM.is_node_progressive pm pg node) then Stack.push node nonprog) nodes;
   (** Call lift on non-progressive until all progressive **)
   while not (Stack.is_empty nonprog) do
+    log_debug (ProgressMeasure.show pm);
     let non_prog_node = Stack.pop nonprog in
+    log_debug ("Picked non-progressive node " ^ nd_show non_prog_node);
     PM.lift pm pg non_prog_node;
     (** TODO: Optimise by keeping track of strategy **)
     (** Add predecessors that became non-progressive to the stack **)
+    log_debug "Checking if predecessors became non-progressive";
     let pred = PG.pg_get_predecessors pg non_prog_node in
     PG.ns_iter (fun node -> if not (PM.is_node_progressive pm pg node) then Stack.push node nonprog) pred;
   done;
-  let sol = PG.sol_init pg (
-    fun node ->
-      match PM.getAC pm node with
+  log_debug "All nodes progressive, finishing up";
+  let sol = PG.sol_init pg 
+    (fun node ->
+      let node_AC = PM.getAC pm node in
+      log_debug ("Considering node " ^ nd_show node ^ " with AC " ^ AdaptiveCounter.show node_AC);
+      match node_AC with
       | AdaptiveCounter.Top -> PG.plr_Odd
       | AdaptiveCounter.ACounter _ -> PG.plr_Even);
   in
-  (sol, PG.str_make 0)
+  sol, PG.str_make 3
 
 
 let register () =

@@ -78,6 +78,10 @@ module ProgressMeasure : sig
   val d : int ref
   (** Number of nodes with odd priority **)
   val mu : int ref
+  (** Size of the ProgressMeasure i.e. the number of nodes **)
+  val size : t -> int
+  (** Returns the string representation of the ProgressMeasure **)
+  val show : t -> string
   (** Create ProgressMeasure mapping all nodes to the
       lowest possible AdaptiveCounter **)
   val create              : Paritygame.paritygame -> Paritygame.nodeset -> t
