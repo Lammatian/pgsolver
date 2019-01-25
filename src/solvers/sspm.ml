@@ -112,7 +112,7 @@ module AdaptiveCounter = struct
 
   let compare ac1 ac2 =
     match ac1, ac2 with
-    | Top, Top -> 1 (** TODO: Check this **)
+    | Top, Top -> 1 (** TODO: Check this: true because Top Top is progressive **)
     | Top, ACounter arr -> 1
     | ACounter arr, Top -> -1
     | (ACounter arr1 as ac1), (ACounter arr2 as ac2) ->
@@ -187,7 +187,9 @@ module ProgressMeasure = struct
     in
     d := if maxPriority mod 2 = 0 then maxPriority else maxPriority + 1;
     mu := Paritygame.pg_get_selected_priorities pg (fun x -> x mod 2 = 1) |> List.length;
-    Hashtbl.create (Paritygame.ns_size nodes)
+    let ht = Hashtbl.create (Paritygame.ns_size nodes) in
+    Paritygame.ns_iter (fun node -> Hashtbl.add ht node AdaptiveCounter.empty) nodes;
+    ht
 
   let lift_ pm pg node neighbour =
     (** TODO: What if neighbourAC is top **)
@@ -245,15 +247,62 @@ module ProgressMeasure = struct
 
   let getAC pm node = Hashtbl.find pm node
 
+  (** TODO: Implement lol **)
   let getWinningSet pm = Paritygame.sol_make 0
 
+  (** TODO: Implement lol **)
   let getWinningStrategy pm = Paritygame.str_make 0
+
+  let is_edge_progressive pm pg n1 n2 =
+    if Paritygame.ns_elem n2 (Paritygame.pg_get_successors pg n1) then
+      let ac1 = Hashtbl.find pm n1 in 
+      let ac2 = Hashtbl.find pm n2 in
+      let p = Paritygame.pg_get_priority pg n1 in
+      let trimmed_ac1 = AdaptiveCounter.trim ac1 p in
+      let trimmed_ac2 = AdaptiveCounter.trim ac2 p in
+      if p mod 2 = 0 then trimmed_ac1 >= trimmed_ac2
+      else trimmed_ac1 > trimmed_ac2
+    else 
+      failwith "Non-existing edge cannot be progressive"
+
+  let is_node_progressive pm pg node =
+    let owner = Paritygame.pg_get_owner pg node in
+    let successors = Paritygame.pg_get_successors pg node in
+    if owner = Paritygame.plr_Even then
+      (** Exists **)
+      Paritygame.ns_exists (fun succ -> is_edge_progressive pm pg node succ) successors
+    else
+      (** For all **)
+      Paritygame.ns_forall (fun succ -> is_edge_progressive pm pg node succ) successors
 end
 
-(** At start, get all non-progressive **)
-(** Then do lift on non-progressive until all progressive **)
-(** Requires progressiveness check **)
-let solve (game : Paritygame.paritygame) = (sol_make 0, str_make 0)
+(** TODO: Implement strategy return **)
+let solve (pg : Paritygame.paritygame) =
+  let module PG = Paritygame in
+  let module PM = ProgressMeasure in
+  (** Initialise the progress measure **)
+  let nodes = PG.collect_nodes pg (fun _ _ -> true) in
+  let pm = PM.create pg nodes in
+  (** Get all non-progressive **)
+  let nonprog = Stack.create () in
+  PG.ns_iter (fun node -> if not (PM.is_node_progressive pm pg node) then Stack.push node nonprog) nodes;
+  (** Call lift on non-progressive until all progressive **)
+  while not (Stack.is_empty nonprog) do
+    let non_prog_node = Stack.pop nonprog in
+    PM.lift pm pg non_prog_node;
+    (** TODO: Optimise by keeping track of strategy **)
+    (** Add predecessors that became non-progressive to the stack **)
+    let pred = PG.pg_get_predecessors pg non_prog_node in
+    PG.ns_iter (fun node -> if not (PM.is_node_progressive pm pg node) then Stack.push node nonprog) pred;
+  done;
+  let sol = PG.sol_init pg (
+    fun node ->
+      match PM.getAC pm node with
+      | AdaptiveCounter.Top -> PG.plr_Odd
+      | AdaptiveCounter.ACounter _ -> PG.plr_Even);
+  in
+  (sol, PG.str_make 0)
+
 
 let register () =
   Solverregistry.register_solver
