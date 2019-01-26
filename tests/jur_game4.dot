@@ -1,0 +1,38 @@
+digraph G {
+N0 [ shape="diamond", label="L(0,0): 0", color="black" ];
+N0 -> N1 [ color="black" ];
+N1 [ shape="box", label="R(0,0): 1", color="black" ];
+N1 -> N0 [ color="black" ];
+N1 -> N2 [ color="black" ];
+N1 -> N3 [ color="black" ];
+N2 [ shape="diamond", label="L(0,1): 0", color="black" ];
+N2 -> N1 [ color="black" ];
+N2 -> N4 [ color="black" ];
+N3 [ shape="diamond", label="R(1,0): 2", color="black" ];
+N3 -> N1 [ color="black" ];
+N3 -> N7 [ color="black" ];
+N3 -> N10 [ color="black" ];
+N4 [ shape="box", label="R(0,1): 1", color="black" ];
+N4 -> N2 [ color="black" ];
+N4 -> N5 [ color="black" ];
+N4 -> N6 [ color="black" ];
+N5 [ shape="diamond", label="L(0,2): 0", color="black" ];
+N5 -> N4 [ color="black" ];
+N6 [ shape="diamond", label="R(1,1): 2", color="black" ];
+N6 -> N4 [ color="black" ];
+N6 -> N7 [ color="black" ];
+N6 -> N8 [ color="black" ];
+N7 [ shape="box", label="L(1,1): 2", color="black" ];
+N7 -> N3 [ color="black" ];
+N7 -> N6 [ color="black" ];
+N7 -> N9 [ color="black" ];
+N8 [ shape="box", label="L(1,2): 2", color="black" ];
+N8 -> N6 [ color="black" ];
+N9 [ shape="diamond", label="A(1,1): 3", color="black" ];
+N9 -> N6 [ color="black" ];
+N10 [ shape="box", label="L(1,0): 2", color="black" ];
+N10 -> N3 [ color="black" ];
+N10 -> N11 [ color="black" ];
+N11 [ shape="diamond", label="A(1,0): 3", color="black" ];
+N11 -> N3 [ color="black" ];
+}
