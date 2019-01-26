@@ -1,0 +1,15 @@
+digraph G {
+N0 [ shape="diamond", label="L(0,0): 0", color="black" ];
+N0 -> N1 [ color="black" ];
+N1 [ shape="box", label="R(0,0): 1", color="black" ];
+N1 -> N0 [ color="black" ];
+N1 -> N2 [ color="black" ];
+N2 [ shape="diamond", label="L(0,1): 0", color="black" ];
+N2 -> N1 [ color="black" ];
+N2 -> N3 [ color="black" ];
+N3 [ shape="box", label="R(0,1): 1", color="black" ];
+N3 -> N2 [ color="black" ];
+N3 -> N4 [ color="black" ];
+N4 [ shape="diamond", label="L(0,2): 0", color="black" ];
+N4 -> N3 [ color="black" ];
+}

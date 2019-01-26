@@ -384,5 +384,5 @@ let register () =
   Solverregistry.register_solver
     solve
     "succsmallpm"
-    "sspm"
+    "progm"
     "Quasi-polynomial time algorithm by Jurdzinski and Lazic (2017)"
