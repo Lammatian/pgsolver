@@ -40,6 +40,7 @@ module BString = struct
         arr.(0) <- true;
         BString arr
       | BString bstr as bstring ->
+        (** Create new array 10...0 and append to the old **)
         let arr = Array.make (n - (length bstring)) false in
         arr.(0) <- true;
         BString (Array.append bstr arr)
@@ -64,6 +65,10 @@ module BString = struct
     | Empty -> false (** TODO: Check if correct **)
     | BString arr ->
       Array.for_all (fun x -> x) arr
+
+  let is_empty = function
+    | Empty -> true
+    | BString _ -> false
 
   let compare bstr1 bstr2 =
     match bstr1, bstr2 with
@@ -170,6 +175,10 @@ module AdaptiveCounter = struct
     | Top -> failwith "getLast called on AdaptiveCounter.Top"
     | ACounter arr -> arr.(Array.length arr - 1)
 
+  let remove_last = function
+    | Top -> failwith "remove_last called on AdaptiveCounter.Top"
+    | ACounter arr -> ACounter (Array.sub arr 0 (Array.length arr - 1))
+
   let trim_to_last_nonempty ac =
     log_info "Calling trim_to_last_nonempty";
     match ac with
@@ -255,7 +264,6 @@ module ProgressMeasure = struct
     else 
     let clog_mu = float_of_int !mu |> log2 |> ceil |> int_of_float in
     log_debug ("Value of k is " ^ string_of_int k);
-    log_debug ("Value of k is " ^ string_of_int k);
     log_debug ("Value of clog_mu is " ^ string_of_int clog_mu);
     if k > p then (** Append 0s to the total max length **)
     begin      
@@ -269,10 +277,14 @@ module ProgressMeasure = struct
     begin
       log_debug "AdaptiveCounter not fully filled in, filling in";
       let last_elt = AC.getLast trimmedNAC in
+      log_debug ("Last element in trimmed: " ^ BS.show last_elt);
       (** TODO: Check this: wrong interpretation of append **)
-      let extension_len = clog_mu - AC.lengthBS trimmedNAC in
+      let extension_len = clog_mu - (AC.lengthBS trimmedNAC - BS.length last_elt) in
+      log_debug ("Extension length: " ^ string_of_int extension_len);
       let extended_last = BS.append last_elt extension_len in
+      log_debug ("Extended last: " ^ BS.show extended_last);
       AC.set trimmedNAC (AC.length trimmedNAC - 1) extended_last;
+      log_debug ("lift_ returned " ^ AC.show trimmedNAC);
       trimmedNAC
     end
     else
@@ -286,14 +298,21 @@ module ProgressMeasure = struct
       AC.set trimmed_to_nonempty (AC.length trimmed_to_nonempty - 1) cut_last;
       trimmed_to_nonempty
     else if AC.length trimmed_to_nonempty > 1 then
+    (** TODO: This had a bug e.g. in (e, 11) case where it wanted
+              to trim more when we just want to remove last **)
+    begin
       (** Remove last and set the second to last appropriately **)
-      let extension_len = AC.getLast trimmed_to_nonempty |> BS.length in
-      AC.set trimmed_to_nonempty (AC.length trimmed_to_nonempty - 1) (BS.create []);
-      let new_trimmed = AC.trim_to_last_nonempty trimmed_to_nonempty in
-      let last_in_trimmed = AC.getLast new_trimmed in
-      let extended_last = BS.append last_in_trimmed extension_len in
-      AC.set new_trimmed (AC.length new_trimmed - 1) extended_last;
-      new_trimmed
+      (** TODO: is this needed?
+          let extension_len = AC.getLast trimmed_to_nonempty |> BS.length in **)
+      let removed_last = AC.remove_last trimmed_to_nonempty in
+      let last_in_shortened = AC.getLast removed_last in
+      (** TODO: This is complicated lol make it easier to read **)
+      let extension_len = clog_mu - (AC.lengthBS removed_last - BS.length last_in_shortened) in
+      let extended_last = BS.append last_in_shortened extension_len in
+      AC.set removed_last (AC.length removed_last - 1) extended_last;
+      log_debug ("lift_ returned " ^ AC.show removed_last);
+      removed_last
+    end
     else
       AC.Top
 
@@ -387,7 +406,7 @@ let solve game =
 
 let register () =
   Solverregistry.register_solver
-    solve'
+    solve
     "succsmallpm"
     "progm"
     "Quasi-polynomial time algorithm by Jurdzinski and Lazic (2017)"

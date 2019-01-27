@@ -21,6 +21,8 @@ module BString : sig
   val cut       : t -> t
   (** Check if BString is maximal of its length (i.e. only 1s) **)
   val is_max    : t -> bool
+  (** Check if BString is empty **)
+  val is_empty  : t -> bool
   (** Compare two BStrings with each other, returning
       -1 if first is smaller, 0 if they're equal and
       1 if first is bigger than the second one **)
@@ -59,6 +61,8 @@ module AdaptiveCounter : sig
   val append     : t -> BString.t -> t
   (** Get last item of the AdaptiveCounter **)
   val getLast    : t -> BString.t
+  (** Remove last item of the AdaptiveCounter **)
+  val remove_last : t -> t
   (** Trim the AdaptiveCounter to last non-empty BString **)
   val trim_to_last_nonempty : t -> t
   (** Set the BString at specified index **)
