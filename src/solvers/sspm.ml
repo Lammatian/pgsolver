@@ -85,10 +85,10 @@ module BString = struct
           i := !i + 1;
       done;
       if not (!ret = 0) then !ret (** Last was different **)
-      else if !i = length b1 && !i = length b2 then !ret (** Reached the end in both so identical **)
-      else if !i < length b1 && arr1.(!i) then 1         (** [b1] of form [b2]1..., so bigger than [b2] **)
+      else if !i = length b1 && !i = length b2 then !ret (** Reached the end in both so identical        **)
+      else if !i < length b1 && arr1.(!i) then 1         (** [b1] of form [b2]1..., so bigger than [b2]  **)
       else if !i < length b1 then -1                     (** [b1] of form [b2]0..., so smaller than [b2] **)
-      else if !i < length b2 && arr2.(!i) then -1        (** [b2] of form [b1]1..., bigger than [b1] **)
+      else if !i < length b2 && arr2.(!i) then -1        (** [b2] of form [b1]1..., so bigger than [b1]  **)
       else 1                                             (** [b2] of form [b1]0..., so smaller than [b1] **)
 end
 
@@ -302,8 +302,6 @@ module ProgressMeasure = struct
               to trim more when we just want to remove last **)
     begin
       (** Remove last and set the second to last appropriately **)
-      (** TODO: is this needed?
-          let extension_len = AC.getLast trimmed_to_nonempty |> BS.length in **)
       let removed_last = AC.remove_last trimmed_to_nonempty in
       let last_in_shortened = AC.getLast removed_last in
       (** TODO: This is complicated lol make it easier to read **)
@@ -332,12 +330,6 @@ module ProgressMeasure = struct
 
   let getAC pm node = Hashtbl.find pm node
 
-  (** TODO: Implement lol **)
-  let getWinningSet pm = Paritygame.sol_make 0
-
-  (** TODO: Implement lol **)
-  let getWinningStrategy pm = Paritygame.str_make 0
-
   let is_edge_progressive pm pg n1 n2 =
     if Paritygame.ns_elem n2 (Paritygame.pg_get_successors pg n1) then
       let ac1 = Hashtbl.find pm n1 in 
@@ -359,6 +351,30 @@ module ProgressMeasure = struct
     else
       (** For all **)
       Paritygame.ns_forall (fun succ -> is_edge_progressive pm pg node succ) successors
+
+  (** TODO: Implement lol **)
+  let get_winning_set pm pg = 
+    Paritygame.sol_init pg 
+      (fun node ->
+        let node_AC = getAC pm node in
+        log_debug ("Considering node " ^ nd_show node ^ " with AC " ^ AdaptiveCounter.show node_AC);
+        match node_AC with
+        | AdaptiveCounter.Top -> Paritygame.plr_Odd
+        | AdaptiveCounter.ACounter _ -> Paritygame.plr_Even)
+
+  (** TODO: Implement lol **)
+  let get_winning_strategy pm pg nodes = 
+    let module PG = Paritygame in
+    let str = PG.str_make (PG.ns_size nodes) in
+    PG.str_iter 
+      (fun n1 n2 -> 
+        if PG.pg_get_owner pg n1 = PG.plr_Even && not (AdaptiveCounter.isMax (getAC pm n1)) then
+          (** Find progressive successor **)
+          let successors = PG.pg_get_successors pg n1 in
+          PG.str_set str n1 (PG.ns_find (fun succ -> is_edge_progressive pm pg n1 succ) successors)
+      ) 
+      str;
+    str
 end
 
 (** TODO: Implement strategy return **)
@@ -389,16 +405,10 @@ let solve' (pg : Paritygame.paritygame) : (Paritygame.solution * Paritygame.stra
     nonprog := PG.ns_filter (fun node -> not (PM.is_node_progressive pm pg node)) pred |>
                 PG.ns_fold (fun acc node -> PG.ns_add node acc) !nonprog;
   done;
-  log_debug "All nodes progressive, finishing up";
-  let sol = PG.sol_init pg 
-    (fun node ->
-      let node_AC = PM.getAC pm node in
-      log_debug ("Considering node " ^ nd_show node ^ " with AC " ^ AdaptiveCounter.show node_AC);
-      match node_AC with
-      | AdaptiveCounter.Top -> PG.plr_Odd
-      | AdaptiveCounter.ACounter _ -> PG.plr_Even);
-  in
-  sol, PG.str_make (PG.ns_size nodes) 
+  log_info "All nodes progressive, finishing up";
+  let sol = PM.get_winning_set pm pg in
+  let str = PM.get_winning_strategy pm pg nodes in
+  sol, str
 
 let solve game = 
   let open Univsolve in

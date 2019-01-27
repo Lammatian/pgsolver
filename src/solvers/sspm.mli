@@ -88,21 +88,21 @@ module ProgressMeasure : sig
   val show : t -> string
   (** Create ProgressMeasure mapping all nodes to the
       lowest possible AdaptiveCounter **)
-  val create              : Paritygame.paritygame -> Paritygame.nodeset -> t
+  val create               : Paritygame.paritygame -> Paritygame.nodeset -> t
   (** Lift method for making the given node progressive **)
-  val lift                : t -> Paritygame.paritygame -> Paritygame.node -> unit
+  val lift                 : t -> Paritygame.paritygame -> Paritygame.node -> unit
   (** Helper lift method for determining the smallest
       AdaptiveCounter making the edge progressive **)
-  val lift_               : t -> Paritygame.paritygame -> Paritygame.node -> Paritygame.node -> AdaptiveCounter.t
+  val lift_                : t -> Paritygame.paritygame -> Paritygame.node -> Paritygame.node -> AdaptiveCounter.t
   (** Get AdaptiveCounter for the given node **)
-  val getAC               : t -> Paritygame.node -> AdaptiveCounter.t
-  (** Get the winning set for the given ProgressMeasure **)
-  val getWinningSet       : t -> Paritygame.solution
-  (** Get the winning strategy for the given ProgressMeasure **)
-  val getWinningStrategy  : t -> Paritygame.strategy
+  val getAC                : t -> Paritygame.node -> AdaptiveCounter.t
   (** Check if a given edge is progressive. Returns
       an error if edge doesn't exist **)
-  val is_edge_progressive : t -> Paritygame.paritygame -> Paritygame.node -> Paritygame.node -> bool
+  val is_edge_progressive  : t -> Paritygame.paritygame -> Paritygame.node -> Paritygame.node -> bool
   (** Check if a given node is progressive **)
-  val is_node_progressive : t -> Paritygame.paritygame -> Paritygame.node -> bool
+  val is_node_progressive  : t -> Paritygame.paritygame -> Paritygame.node -> bool
+  (** Get the winning set for the given ProgressMeasure **)
+  val get_winning_set      : t -> Paritygame.paritygame -> Paritygame.solution
+  (** Get the winning strategy for the given ProgressMeasure **)
+  val get_winning_strategy : t -> Paritygame.paritygame -> Paritygame.nodeset -> Paritygame.strategy
 end
