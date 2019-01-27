@@ -73,13 +73,18 @@ module BString = struct
     | (BString arr1 as b1), (BString arr2 as b2) ->
       let i = ref 0 in
       let ret = ref 0 in
-      while !ret == 0 && !i < length b1 && !i < length b2 do 
+      while !ret = 0 && !i < length b1 && !i < length b2 do 
         if arr1.(!i) && not arr2.(!i) then ret := 1
         else if not arr1.(!i) && arr2.(!i) then ret := -1
         else
           i := !i + 1;
       done;
-      !ret
+      if not (!ret = 0) then !ret (** Last was different **)
+      else if !i = length b1 && !i = length b2 then !ret (** Reached the end in both so identical **)
+      else if !i < length b1 && arr1.(!i) then 1         (** [b1] of form [b2]1..., so bigger than [b2] **)
+      else if !i < length b1 then -1                     (** [b1] of form [b2]0..., so smaller than [b2] **)
+      else if !i < length b2 && arr2.(!i) then -1        (** [b2] of form [b1]1..., bigger than [b1] **)
+      else 1                                             (** [b2] of form [b1]0..., so smaller than [b1] **)
 end
 
 module AdaptiveCounter = struct
@@ -382,7 +387,7 @@ let solve game =
 
 let register () =
   Solverregistry.register_solver
-    solve
+    solve'
     "succsmallpm"
     "progm"
     "Quasi-polynomial time algorithm by Jurdzinski and Lazic (2017)"
