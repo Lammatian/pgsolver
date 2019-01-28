@@ -49,7 +49,7 @@ module BString = struct
 
   let cut bstr =
     (** TODO: Check if this works lol **)
-    log_info ("Calling cut on BString " ^ show bstr);
+    log_debug ("Calling cut on BString " ^ show bstr);
     match bstr with
     | Empty -> Empty
     | BString arr as bstring ->
@@ -315,7 +315,7 @@ module ProgressMeasure = struct
   let lift pm pg node =
     let module AC = AdaptiveCounter in
     let module PG = Paritygame in
-    log_info ("Calling lift on node " ^ nd_show node);
+    log_debug ("Calling lift on node " ^ nd_show node);
     let neighbours = PG.pg_get_successors pg node |> PG.ns_nodes in
     let newAC = 
     if PG.pg_get_owner pg node = PG.plr_Even then (** Minimum **)
@@ -323,7 +323,7 @@ module ProgressMeasure = struct
     else (** Maximum **)
       List.fold_left (fun acc x -> AC.max acc (lift_ pm pg node x)) AC.empty neighbours
     in
-    log_info ("New AC for that node is " ^ AC.show newAC);
+    log_debug ("New AC for that node is " ^ AC.show newAC);
     Hashtbl.replace pm node newAC
 
   let getAC pm node = Hashtbl.find pm node
@@ -424,7 +424,7 @@ let invert pg =
     (fun node ->
       (
         (** Increase priority by 1 **)
-        Paritygame.pg_get_priority pg node + 1,
+        1 + Paritygame.pg_get_priority pg node,
         (** Change the ownership of each node to match up the priority change **)
         Paritygame.plr_opponent (Paritygame.pg_get_owner pg node),
         (** Keep the successors and description **)
@@ -441,22 +441,28 @@ let solve_for_odd pg (sol, str) =
   (** Check if there's anything to solve for Odd **)
   if PG.pg_size subgame > 0 then
   begin
-    log_debug "Odd has winning nodes, finding strategies";
+    log_info "Odd has winning nodes, finding strategies";
     (** Invert the subgame and solve the inverted for Even **)
-    let inverted = invert pg in
-    log_debug "Solving inverted game";
-    let (sol_inv, str_inv) = solve' inverted in
-    log_debug "Solved inverted game";
+    let inverted = invert subgame in
+    log_info "Solving inverted game";
+    let (_, str_inv) = solve' inverted in
+    log_info "Solved inverted game";
     (** Update the strategies **)
     PG.str_iter
       (fun n1 n2 ->
-        if PG.pg_get_owner inverted n1 = PG.plr_Even then
-          PG.str_set str (map_to_game n1) (map_to_game n2))
+        log_debug (
+          "Updating the strategy for nodes " ^ 
+          PG.nd_show n1 ^ 
+          " and " ^
+          PG.nd_show n2);
+        if PG.pg_get_owner inverted n1 = PG.plr_Even
+        then PG.str_set str (map_to_game n1) (map_to_game n2)
+      )
       str_inv;
-    (sol, str)
-  end
-  else
-    (sol, str)
+  end;
+  log_debug ("Sol size: " ^ (Array.length sol |> string_of_int));
+  log_debug ("Str size: " ^ (Array.length str |> string_of_int));
+  (sol, str)
 
 let solve game = 
   let open Univsolve in
