@@ -132,7 +132,6 @@ module AdaptiveCounter = struct
 
   let trim ac n =
     (** TODO: Test this **)
-    log_info ("Calling trim on " ^ show ac ^ " with π(n) = " ^ string_of_int n);
     match ac with
     | Top -> Top
     | ACounter arr ->
@@ -180,7 +179,6 @@ module AdaptiveCounter = struct
     | ACounter arr -> ACounter (Array.sub arr 0 (Array.length arr - 1))
 
   let trim_to_last_nonempty ac =
-    log_info "Calling trim_to_last_nonempty";
     match ac with
     (** TODO: Test if this works lol **)
     | Top -> failwith "trim_to_last_nonempty called on AdaptiveCounter.Top"
@@ -362,7 +360,6 @@ module ProgressMeasure = struct
         | AdaptiveCounter.Top -> Paritygame.plr_Odd
         | AdaptiveCounter.ACounter _ -> Paritygame.plr_Even)
 
-  (** TODO: Implement lol **)
   let get_winning_strategy pm pg nodes = 
     let module PG = Paritygame in
     let str = PG.str_make (PG.ns_size nodes) in
@@ -377,16 +374,24 @@ module ProgressMeasure = struct
     str
 end
 
-(** TODO: Implement strategy return **)
 let solve' (pg : Paritygame.paritygame) : (Paritygame.solution * Paritygame.strategy) =
+  Paritygame.pg_iterate (fun node _ ->
+    log_debug (
+      "Node " ^ 
+      Paritygame.nd_show node ^ 
+      " with priority " ^
+      (Paritygame.pg_get_priority pg node |> string_of_int) ^
+      " belonging to player " ^
+      (if Paritygame.pg_get_owner pg node = Paritygame.plr_Even then "Even" else "Odd") ^
+      " with successors [" ^ 
+      List.fold_left (fun acc x -> acc ^ "," ^ Paritygame.nd_show x) "" (Paritygame.pg_get_successors pg node |> Paritygame.ns_nodes) ^
+      "]"))
+    pg;
   let module PG = Paritygame in
   let module PM = ProgressMeasure in
   (** Initialise the progress measure **)
   let nodes = PG.collect_nodes pg (fun _ _ -> true) in
   let pm = PM.create pg nodes in
-  (** Strategy for even where if edge is non-progressive
-      the node is set to nd_undef. TODO: Use **)
-  (** let strategy = PG.str_create pg in **)
   (** Get all non-progressive **)
   let nonprog = ref (PG.ns_filter (fun node -> not (PM.is_node_progressive pm pg node)) nodes) in
   (** Call lift on non-progressive until all progressive **)
@@ -403,16 +408,59 @@ let solve' (pg : Paritygame.paritygame) : (Paritygame.solution * Paritygame.stra
     log_debug "Checking if predecessors became non-progressive";
     let pred = PG.pg_get_predecessors pg non_prog_node in
     nonprog := PG.ns_filter (fun node -> not (PM.is_node_progressive pm pg node)) pred |>
-                PG.ns_fold (fun acc node -> PG.ns_add node acc) !nonprog;
+               PG.ns_fold (fun acc node -> PG.ns_add node acc) !nonprog;
   done;
   log_info "All nodes progressive, finishing up";
   let sol = PM.get_winning_set pm pg in
   let str = PM.get_winning_strategy pm pg nodes in
   sol, str
 
+let invert pg =
+  (** Invert the game by adding one to each priority
+      and changing the ownership of nodes **)
+  log_debug "Inverting the game";
+  Paritygame.pg_init
+    (Paritygame.pg_size pg)
+    (fun node ->
+      (
+        (** Increase priority by 1 **)
+        Paritygame.pg_get_priority pg node + 1,
+        (** Change the ownership of each node to match up the priority change **)
+        Paritygame.plr_opponent (Paritygame.pg_get_owner pg node),
+        (** Keep the successors and description **)
+        Paritygame.ns_nodes (Paritygame.pg_get_successors pg node),
+        Paritygame.pg_get_desc pg node
+      )
+    )
+
+let solve_for_odd pg (sol, str) =
+  log_debug "Solving the game for player Odd";
+  let module PG = Paritygame in
+  (** Filter out nodes won by Even as they cannot be visited anyway **)
+  let (subgame, map_to_sub, map_to_game) = PG.subgame_by_node_filter pg (fun node -> sol.(node) <> PG.plr_Even) in
+  (** Check if there's anything to solve for Odd **)
+  if PG.pg_size subgame > 0 then
+  begin
+    log_debug "Odd has winning nodes, finding strategies";
+    (** Invert the subgame and solve the inverted for Even **)
+    let inverted = invert pg in
+    log_debug "Solving inverted game";
+    let (sol_inv, str_inv) = solve' inverted in
+    log_debug "Solved inverted game";
+    (** Update the strategies **)
+    PG.str_iter
+      (fun n1 n2 ->
+        if PG.pg_get_owner inverted n1 = PG.plr_Even then
+          PG.str_set str (map_to_game n1) (map_to_game n2))
+      str_inv;
+    (sol, str)
+  end
+  else
+    (sol, str)
+
 let solve game = 
   let open Univsolve in
-  universal_solve (universal_solve_init_options_verbose !universal_solve_global_options) (solve') game
+  universal_solve (universal_solve_init_options_verbose !universal_solve_global_options) (fun pg -> solve' pg |> solve_for_odd pg) game
 
 let register () =
   Solverregistry.register_solver
