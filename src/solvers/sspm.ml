@@ -202,6 +202,8 @@ module AdaptiveCounter = struct
   let isMax = function
     | Top -> true
     | ACounter _ -> false
+
+  let is_empty ac = length ac = 0
 end
 
 (** Helper function since OCaml is poor **)
@@ -288,6 +290,17 @@ module ProgressMeasure = struct
     else
     let trimmed_to_nonempty = AC.trim_to_last_nonempty trimmedNAC in
     log_debug ("Trimmed to non-empty: " ^ AC.show trimmed_to_nonempty);
+    (** If the resulting AdaptiveCounter at this step is empty
+        then the next biggest must be Top:
+        if this is empty then clog_mu must be 0 i.e. we encountered
+        an AdaptiveCounter of only ε's and since k <= p, it was
+        maximal. Thus the next smallest thing is Top **)
+    if AC.is_empty trimmed_to_nonempty then
+    begin
+      log_debug "Trimmed to non-empty is empty, next smallest is Top";
+      AC.Top
+    end 
+    else
     let last_in_trimmed = AC.getLast trimmed_to_nonempty in
     log_debug ("Last in trimmed: " ^ BS.show last_in_trimmed);
     if not (BS.is_max last_in_trimmed) then

@@ -69,6 +69,8 @@ module AdaptiveCounter : sig
   val set        : t -> int -> BString.t -> unit
   (** Determine if the AdaptiveCounter is the top element **)
   val isMax      : t -> bool
+  (** Determine if the AdaptiveCounter is empty **)
+  val is_empty   : t -> bool
   (** Returns the string representation of the AdaptiveCounter **)
   val show       : t -> string
   (** Prints the BString to the standard output **)
