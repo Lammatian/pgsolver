@@ -1,25 +1,24 @@
 open Basics;;
 open Paritygame;;
 
-let log_debug msg = message_autotagged 3 (fun _ -> "SSMP") (fun _ -> msg ^ "\n") ;;
-let log_verb msg = message_autotagged 2 (fun _ -> "SSMP") (fun _ -> msg ^ "\n") ;;
-let log_info msg = message_autotagged 2 (fun _ -> "SSMP") (fun _ -> msg ^ "\n") ;;
+let log_debug msg = message_autotagged 3 (fun _ -> "SSPM") (fun _ -> msg ^ "\n") ;;
+let log_verb msg = message_autotagged 2 (fun _ -> "SSPM") (fun _ -> msg ^ "\n") ;;
+let log_info msg = message_autotagged 2 (fun _ -> "SSPM") (fun _ -> msg ^ "\n") ;;
 
 module BString = struct
-  type t = BString of bool array | Empty
+  type t = BString of bool list | Empty
 
   let create = function
     | [] -> Empty
-    | list -> BString (Array.of_list list)
+    | list -> BString list
 
-  let createLen = function
+  let create_len = function
     | 0 -> Empty
-    | l -> BString (Array.make l false)
+    | l -> BString (List.init l (fun _ -> false))
 
   let show = function
     | Empty -> "ε"
-    | BString arr ->
-      let list = Array.to_list arr in
+    | BString list ->
       let rec loop = function
         | [] -> ""
         | hd :: tl -> (if hd then "1" else "0") ^ loop tl
@@ -30,41 +29,41 @@ module BString = struct
 
   let length = function
     | Empty -> 0
-    | BString list -> Array.length list
+    | BString list -> List.length list
 
   let append bstr n =
     if length bstr < n then
       match bstr with
       | Empty ->
-        let arr = Array.make n false in
-        arr.(0) <- true;
-        BString arr
-      | BString bstr as bstring ->
-        (** Create new array 10...0 and append to the old **)
-        let arr = Array.make (n - (length bstring)) false in
-        arr.(0) <- true;
-        BString (Array.append bstr arr)
+        let 
+          list = List.init n (fun i -> i = 0)
+        in
+        BString list
+      | BString list ->
+        let to_add = n - length bstr in
+        let zeros = List.init to_add (fun i -> i = 0) in
+        BString (List.append list zeros)
     else
       bstr
-
+  
   let cut bstr =
-    (** TODO: Check if this works lol **)
-    log_debug ("Calling cut on BString " ^ show bstr);
     match bstr with
     | Empty -> Empty
-    | BString arr as bstring ->
-      let last_one = ref ((length bstring) - 1) in
-      while arr.(!last_one) do
-        last_one := !last_one - 1
-      done;
-      let new_arr = Array.sub arr 0 !last_one in
-      if Array.length new_arr = 0 then Empty
-      else BString (Array.sub arr 0 !last_one)
+    | BString list ->
+      (** Cut zeros from start in reversed **)
+      let rec cut_zero = function
+        | [] -> []
+        | hd :: tl ->
+          if hd then cut_zero tl else tl
+      in
+      let list_cut = List.rev list |> cut_zero |> List.rev in
+      if List.length list_cut = 0 then Empty
+      else BString list_cut
 
   let is_max = function
-    | Empty -> false (** TODO: Check if correct **)
-    | BString arr ->
-      Array.for_all (fun x -> x) arr
+    | Empty -> false
+    | BString list ->
+      List.for_all (fun x -> x) list
 
   let is_empty = function
     | Empty -> true
@@ -72,24 +71,21 @@ module BString = struct
 
   let compare bstr1 bstr2 =
     match bstr1, bstr2 with
-    | Empty, Empty       -> 0
-    | Empty, BString arr -> if arr.(0) then -1 else 1
-    | BString arr, Empty -> if arr.(0) then 1 else -1
-    | (BString arr1 as b1), (BString arr2 as b2) ->
-      let i = ref 0 in
-      let ret = ref 0 in
-      while !ret = 0 && !i < length b1 && !i < length b2 do 
-        if arr1.(!i) && not arr2.(!i) then ret := 1
-        else if not arr1.(!i) && arr2.(!i) then ret := -1
-        else
-          i := !i + 1;
-      done;
-      if not (!ret = 0) then !ret (** Last was different **)
-      else if !i = length b1 && !i = length b2 then !ret (** Reached the end in both so identical        **)
-      else if !i < length b1 && arr1.(!i) then 1         (** [b1] of form [b2]1..., so bigger than [b2]  **)
-      else if !i < length b1 then -1                     (** [b1] of form [b2]0..., so smaller than [b2] **)
-      else if !i < length b2 && arr2.(!i) then -1        (** [b2] of form [b1]1..., so bigger than [b1]  **)
-      else 1                                             (** [b2] of form [b1]0..., so smaller than [b1] **)
+    | Empty, Empty           -> 0
+    | BString list, Empty    -> if List.hd list then 1 else -1
+    | Empty, BString list    -> if List.hd list then -1 else 1
+    | BString l1, BString l2 ->
+      let rec compare_rec l1 l2 =
+        match l1, l2 with
+        | [], []             -> 0
+        | hd :: tl, []       -> if hd then  1 else -1
+        | [], hd :: tl       -> if hd then  -1 else 1
+        | h1 :: t1, h2 :: t2 ->
+          if h1 && not h2 then 1
+          else if not h1 && h2 then -1
+          else compare_rec t1 t2
+      in
+      compare_rec l1 l2
 end
 
 module AdaptiveCounter = struct
@@ -270,7 +266,7 @@ module ProgressMeasure = struct
       log_debug "k is greater than priority, appending zeros";
       (** TODO: Check if this works lol **)
       let toAppend = clog_mu - AC.lengthBS neighbourAC in
-      let appendedBS = BS.createLen toAppend in
+      let appendedBS = BS.create_len toAppend in
       AC.append neighbourAC appendedBS
     end
     else if AC.lengthBS trimmedNAC < clog_mu then

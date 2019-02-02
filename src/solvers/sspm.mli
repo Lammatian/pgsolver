@@ -6,27 +6,27 @@ val register: unit -> unit
 module BString : sig
   type t
   (** Create BString from a list of booleans **)
-  val create    : bool list -> t
+  val create     : bool list -> t
   (** Create BString of all 0s of length of the first argument **)
-  val createLen : int -> t
+  val create_len : int -> t
   (** Returns the string representation of the BString **)
-  val show      : t -> string
+  val show       : t -> string
   (** Prints the BString to the standard output **)
-  val print     : t -> unit
+  val print      : t -> unit
   (** Get the length of the bstring **)
-  val length    : t -> int
+  val length     : t -> int
   (** Appends 10...0 to a total length of the second argument **)
-  val append    : t -> int -> t
+  val append     : t -> int -> t
   (** Cut the last 01...1 from the BString **)
-  val cut       : t -> t
+  val cut        : t -> t
   (** Check if BString is maximal of its length (i.e. only 1s) **)
-  val is_max    : t -> bool
+  val is_max     : t -> bool
   (** Check if BString is empty **)
-  val is_empty  : t -> bool
+  val is_empty   : t -> bool
   (** Compare two BStrings with each other, returning
       -1 if first is smaller, 0 if they're equal and
       1 if first is bigger than the second one **)
-  val compare   : t -> t -> int
+  val compare    : t -> t -> int
 end
 
 module AdaptiveCounter : sig
