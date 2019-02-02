@@ -31,7 +31,7 @@ module BString = struct
     | Empty -> 0
     | BString list -> List.length list
 
-  let append bstr n =
+  let extend bstr n =
     if length bstr < n then
       match bstr with
       | Empty ->
@@ -277,7 +277,7 @@ module ProgressMeasure = struct
       (** TODO: Check this: wrong interpretation of append **)
       let extension_len = clog_mu - (AC.length_BStr trimmedNAC - BS.length last_elt) in
       log_debug ("Extension length: " ^ string_of_int extension_len);
-      let extended_last = BS.append last_elt extension_len in
+      let extended_last = BS.extend last_elt extension_len in
       log_debug ("Extended last: " ^ BS.show extended_last);
       AC.set trimmedNAC (AC.length trimmedNAC - 1) extended_last;
       log_debug ("lift_ returned " ^ AC.show trimmedNAC);
@@ -313,7 +313,7 @@ module ProgressMeasure = struct
       let last_in_shortened = AC.get_last removed_last in
       (** TODO: This is complicated lol make it easier to read **)
       let extension_len = clog_mu - (AC.length_BStr removed_last - BS.length last_in_shortened) in
-      let extended_last = BS.append last_in_shortened extension_len in
+      let extended_last = BS.extend last_in_shortened extension_len in
       AC.set removed_last (AC.length removed_last - 1) extended_last;
       log_debug ("lift_ returned " ^ AC.show removed_last);
       removed_last
