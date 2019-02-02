@@ -101,7 +101,7 @@ module AdaptiveCounter = struct
 
   let create list = ACounter (Array.of_list list)
 
-  let createTop = Top
+  let create_top = Top
 
   let show = function
     | Top -> "T"
@@ -120,8 +120,8 @@ module AdaptiveCounter = struct
     | Top -> failwith "length called on AdaptiveCounter.Top"
     | ACounter arr -> Array.length arr
 
-  let lengthBS = function
-    | Top -> failwith "lengthBS called on AdaptiveCounter.Top"
+  let length_BStr = function
+    | Top -> failwith "length_BStr called on AdaptiveCounter.Top"
     | ACounter arr -> Array.fold_left (fun acc x -> acc + BString.length x) 0 arr
 
   let last_index ac = (!d - 1) - 2 * (length ac - 1)
@@ -166,8 +166,8 @@ module AdaptiveCounter = struct
     | Top -> failwith "append called on AdaptiveCounter.Top"
     | ACounter arr -> ACounter (Array.append arr [|bstr|])
 
-  let getLast = function
-    | Top -> failwith "getLast called on AdaptiveCounter.Top"
+  let get_last = function
+    | Top -> failwith "get_last called on AdaptiveCounter.Top"
     | ACounter arr -> arr.(Array.length arr - 1)
 
   let remove_last = function
@@ -195,7 +195,7 @@ module AdaptiveCounter = struct
       if Array.length arr <= n then failwith "index out of bounds"
       else arr.(n) <- bstr
 
-  let isMax = function
+  let is_max = function
     | Top -> true
     | ACounter _ -> false
 
@@ -242,7 +242,7 @@ module ProgressMeasure = struct
     let module BS = BString in
     let neighbourAC = Hashtbl.find pm neighbour in
     log_debug ("Neighbour's AC: " ^ AC.show neighbourAC);
-    if AC.isMax neighbourAC then
+    if AC.is_max neighbourAC then
       AC.Top
     else
     let k = AC.last_index neighbourAC in
@@ -265,17 +265,17 @@ module ProgressMeasure = struct
     begin      
       log_debug "k is greater than priority, appending zeros";
       (** TODO: Check if this works lol **)
-      let toAppend = clog_mu - AC.lengthBS neighbourAC in
+      let toAppend = clog_mu - AC.length_BStr neighbourAC in
       let appendedBS = BS.create_len toAppend in
       AC.append neighbourAC appendedBS
     end
-    else if AC.lengthBS trimmedNAC < clog_mu then
+    else if AC.length_BStr trimmedNAC < clog_mu then
     begin
       log_debug "AdaptiveCounter not fully filled in, filling in";
-      let last_elt = AC.getLast trimmedNAC in
+      let last_elt = AC.get_last trimmedNAC in
       log_debug ("Last element in trimmed: " ^ BS.show last_elt);
       (** TODO: Check this: wrong interpretation of append **)
-      let extension_len = clog_mu - (AC.lengthBS trimmedNAC - BS.length last_elt) in
+      let extension_len = clog_mu - (AC.length_BStr trimmedNAC - BS.length last_elt) in
       log_debug ("Extension length: " ^ string_of_int extension_len);
       let extended_last = BS.append last_elt extension_len in
       log_debug ("Extended last: " ^ BS.show extended_last);
@@ -297,7 +297,7 @@ module ProgressMeasure = struct
       AC.Top
     end 
     else
-    let last_in_trimmed = AC.getLast trimmed_to_nonempty in
+    let last_in_trimmed = AC.get_last trimmed_to_nonempty in
     log_debug ("Last in trimmed: " ^ BS.show last_in_trimmed);
     if not (BS.is_max last_in_trimmed) then
       let cut_last = BS.cut last_in_trimmed in
@@ -310,9 +310,9 @@ module ProgressMeasure = struct
     begin
       (** Remove last and set the second to last appropriately **)
       let removed_last = AC.remove_last trimmed_to_nonempty in
-      let last_in_shortened = AC.getLast removed_last in
+      let last_in_shortened = AC.get_last removed_last in
       (** TODO: This is complicated lol make it easier to read **)
-      let extension_len = clog_mu - (AC.lengthBS removed_last - BS.length last_in_shortened) in
+      let extension_len = clog_mu - (AC.length_BStr removed_last - BS.length last_in_shortened) in
       let extended_last = BS.append last_in_shortened extension_len in
       AC.set removed_last (AC.length removed_last - 1) extended_last;
       log_debug ("lift_ returned " ^ AC.show removed_last);
@@ -335,7 +335,7 @@ module ProgressMeasure = struct
     log_debug ("New AC for that node is " ^ AC.show newAC);
     Hashtbl.replace pm node newAC
 
-  let getAC pm node = Hashtbl.find pm node
+  let get_AC pm node = Hashtbl.find pm node
 
   let is_edge_progressive pm pg n1 n2 =
     if Paritygame.ns_elem n2 (Paritygame.pg_get_successors pg n1) then
@@ -359,11 +359,10 @@ module ProgressMeasure = struct
       (** For all **)
       Paritygame.ns_forall (fun succ -> is_edge_progressive pm pg node succ) successors
 
-  (** TODO: Implement lol **)
   let get_winning_set pm pg = 
     Paritygame.sol_init pg 
       (fun node ->
-        let node_AC = getAC pm node in
+        let node_AC = get_AC pm node in
         log_debug ("Considering node " ^ nd_show node ^ " with AC " ^ AdaptiveCounter.show node_AC);
         match node_AC with
         | AdaptiveCounter.Top -> Paritygame.plr_Odd
@@ -374,7 +373,7 @@ module ProgressMeasure = struct
     let str = PG.str_make (PG.ns_size nodes) in
     PG.str_iter 
       (fun n1 n2 -> 
-        if PG.pg_get_owner pg n1 = PG.plr_Even && not (AdaptiveCounter.isMax (getAC pm n1)) then
+        if PG.pg_get_owner pg n1 = PG.plr_Even && not (AdaptiveCounter.is_max (get_AC pm n1)) then
           (** Find progressive successor **)
           let successors = PG.pg_get_successors pg n1 in
           PG.str_set str n1 (PG.ns_find (fun succ -> is_edge_progressive pm pg n1 succ) successors)

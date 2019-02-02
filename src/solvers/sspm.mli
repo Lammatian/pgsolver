@@ -1,4 +1,4 @@
-(** TODO: Consistency in underscore_naming you dumb fuck **)
+(** TODO: Consistency in underscore_naming you [REDACTED] **)
 
 val solve : Paritygame.paritygame -> Paritygame.solution * Paritygame.strategy
 val register: unit -> unit
@@ -33,48 +33,48 @@ module AdaptiveCounter : sig
   type t
   (** Smallest even number not smaller than any priority
       in our parity game **)
-  val d          : int ref
+  val d           : int ref
   (** Set the value of d **)
-  val set_d      : int -> unit
+  val set_d       : int -> unit
   (** Empty AdaptiveCounter (smallest possible) **)
-  val empty      : t
+  val empty       : t
   (** Create AdaptiveCounter from list of BStrings **)
-  val create     : BString.t list -> t
+  val create      : BString.t list -> t
   (** Create Top AdaptiveCounter **)
-  val createTop  : t
+  val create_top  : t
   (** Get length of the AdaptiveCounter defined as
       the number of BStrings inside it **)
-  val length     : t -> int
+  val length      : t -> int
   (** Get the total length of all BStrings inside the
       AdaptiveCounter **)
-  val lengthBS   : t -> int
+  val length_BStr : t -> int
   (** Get last index of the given AdaptiveCounter counted
       as in the paper **)
-  val last_index : t -> int
+  val last_index  : t -> int
   (** Trim the AdaptiveCounter given a priority **)
-  val trim       : t -> int -> t
+  val trim        : t -> int -> t
   (** Compare two AdaptiveCounters with each other,
       returning -1 if first is smaller, 0 if they're
       equal and 1 if the first is bigger **)
-  val compare    : t -> t -> int
+  val compare     : t -> t -> int
   (** Append a BString to the end of the AdaptiveCounter **)
-  val append     : t -> BString.t -> t
+  val append      : t -> BString.t -> t
   (** Get last item of the AdaptiveCounter **)
-  val getLast    : t -> BString.t
+  val get_last    : t -> BString.t
   (** Remove last item of the AdaptiveCounter **)
   val remove_last : t -> t
   (** Trim the AdaptiveCounter to last non-empty BString **)
   val trim_to_last_nonempty : t -> t
   (** Set the BString at specified index **)
-  val set        : t -> int -> BString.t -> unit
+  val set         : t -> int -> BString.t -> unit
   (** Determine if the AdaptiveCounter is the top element **)
-  val isMax      : t -> bool
+  val is_max      : t -> bool
   (** Determine if the AdaptiveCounter is empty **)
-  val is_empty   : t -> bool
+  val is_empty    : t -> bool
   (** Returns the string representation of the AdaptiveCounter **)
-  val show       : t -> string
-  (** Prints the BString to the standard output **)
-  val print      : t -> unit
+  val show        : t -> string
+  (** Prints the AdaptiveCounter to the standard output **)
+  val print       : t -> unit
 end
 
 module ProgressMeasure : sig
@@ -97,7 +97,7 @@ module ProgressMeasure : sig
       AdaptiveCounter making the edge progressive **)
   val lift_                : t -> Paritygame.paritygame -> Paritygame.node -> Paritygame.node -> AdaptiveCounter.t
   (** Get AdaptiveCounter for the given node **)
-  val getAC                : t -> Paritygame.node -> AdaptiveCounter.t
+  val get_AC               : t -> Paritygame.node -> AdaptiveCounter.t
   (** Check if a given edge is progressive. Returns
       an error if edge doesn't exist **)
   val is_edge_progressive  : t -> Paritygame.paritygame -> Paritygame.node -> Paritygame.node -> bool
