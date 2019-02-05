@@ -91,6 +91,9 @@ module AdaptiveCounter : sig
   (** Set the BString at specified index **)
   val set         : t -> int -> BString.t -> unit
 
+  (** Set the last BString of the AdaptiveCounter **)
+  val set_last    : t -> BString.t -> unit
+
   (** Determine if the AdaptiveCounter is the top element **)
   val is_max      : t -> bool
 

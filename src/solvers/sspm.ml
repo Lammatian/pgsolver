@@ -147,7 +147,7 @@ module AdaptiveCounter = struct
     | (ACounter arr1 as ac1), (ACounter arr2 as ac2) ->
     let i = ref 0 in
     let ret = ref 0 in
-    while !ret == 0 && !i < length ac1 && !i < length ac2 do
+    while !ret = 0 && !i < length ac1 && !i < length ac2 do
       ret := BString.compare arr1.(!i) arr2.(!i);
       i := !i + 1
     done;
@@ -194,6 +194,9 @@ module AdaptiveCounter = struct
     | ACounter arr ->
       if Array.length arr <= n then failwith "index out of bounds"
       else arr.(n) <- bstr
+
+  let set_last ac bstr =
+    set ac (length ac - 1) bstr
 
   let is_max = function
     | Top -> true
@@ -279,7 +282,7 @@ module ProgressMeasure = struct
       log_debug ("Extension length: " ^ string_of_int extension_len);
       let extended_last = BS.extend last_elt extension_len in
       log_debug ("Extended last: " ^ BS.show extended_last);
-      AC.set trimmedNAC (AC.length trimmedNAC - 1) extended_last;
+      AC.set_last trimmedNAC extended_last;
       log_debug ("lift_ returned " ^ AC.show trimmedNAC);
       trimmedNAC
     end
@@ -302,7 +305,7 @@ module ProgressMeasure = struct
     if not (BS.is_max last_in_trimmed) then
       let cut_last = BS.cut last_in_trimmed in
       log_debug ("BString after cut: " ^ BS.show cut_last);
-      AC.set trimmed_to_nonempty (AC.length trimmed_to_nonempty - 1) cut_last;
+      AC.set_last trimmed_to_nonempty cut_last;
       trimmed_to_nonempty
     else if AC.length trimmed_to_nonempty > 1 then
     (** TODO: This had a bug e.g. in (e, 11) case where it wanted
@@ -314,7 +317,7 @@ module ProgressMeasure = struct
       (** TODO: This is complicated lol make it easier to read **)
       let extension_len = clog_mu - (AC.length_BStr removed_last - BS.length last_in_shortened) in
       let extended_last = BS.extend last_in_shortened extension_len in
-      AC.set removed_last (AC.length removed_last - 1) extended_last;
+      AC.set_last removed_last extended_last;
       log_debug ("lift_ returned " ^ AC.show removed_last);
       removed_last
     end
