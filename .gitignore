@@ -32,3 +32,8 @@ scripts/policyitervis/metapostgraphs
 setup.data
 *.byte
 *.cache
+
+# Own files
+tests/failtest_script.gm
+.merlin
+genmer.sh
