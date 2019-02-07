@@ -141,7 +141,7 @@ module AdaptiveCounter = struct
 
   let compare ac1 ac2 =
     match ac1, ac2 with
-    | Top, Top -> 1 (** TODO: Check this: true because Top Top is progressive **)
+    | Top, Top -> 0 (** TODO: Check this: true because Top Top is progressive **)
     | Top, ACounter arr -> 1
     | ACounter arr, Top -> -1
     | (ACounter arr1 as ac1), (ACounter arr2 as ac2) ->
@@ -215,6 +215,8 @@ module ProgressMeasure = struct
 
   let mu = ref 0
 
+  let clog_mu = ref 0
+
   let size = Hashtbl.length
 
   let show pm =
@@ -231,6 +233,7 @@ module ProgressMeasure = struct
     (** Set d in the AdaptiveCounter as well **)
     AdaptiveCounter.set_d !d;
     mu := Paritygame.ns_fold (fun acc node -> acc + (Paritygame.pg_get_priority pg node) mod 2) 0 nodes;
+    clog_mu := float_of_int !mu |> log2 |> ceil |> int_of_float;
     log_debug ("Value of μ: " ^ string_of_int !mu);
     let ht = Hashtbl.create (Paritygame.ns_size nodes) in
     Paritygame.ns_iter (fun node -> Hashtbl.add ht node AdaptiveCounter.empty) nodes;
@@ -249,6 +252,8 @@ module ProgressMeasure = struct
       AC.Top
     else
     let k = AC.last_index neighbourAC in
+    log_debug ("Value of k is " ^ string_of_int k);
+    log_debug ("Value of clog_mu is " ^ string_of_int !clog_mu);
     let p = Paritygame.pg_get_priority pg node in
     let trimmedNAC = AC.trim neighbourAC p in
     log_debug ("Neighbour's trimmed AC: " ^ AC.show trimmedNAC);
@@ -260,25 +265,21 @@ module ProgressMeasure = struct
           is minimum required for it to be progressive **)
       ret
     end
-    else 
-    let clog_mu = float_of_int !mu |> log2 |> ceil |> int_of_float in
-    log_debug ("Value of k is " ^ string_of_int k);
-    log_debug ("Value of clog_mu is " ^ string_of_int clog_mu);
-    if k > p then (** Append 0s to the total max length **)
+    else if k > p then (** Append 0s to the total max length **)
     begin      
       log_debug "k is greater than priority, appending zeros";
       (** TODO: Check if this works lol **)
-      let toAppend = clog_mu - AC.length_BStr neighbourAC in
+      let toAppend = !clog_mu - AC.length_BStr neighbourAC in
       let appendedBS = BS.create_len toAppend in
       AC.append neighbourAC appendedBS
     end
-    else if AC.length_BStr trimmedNAC < clog_mu then
+    else if AC.length_BStr trimmedNAC < !clog_mu then
     begin
       log_debug "AdaptiveCounter not fully filled in, filling in";
       let last_elt = AC.get_last trimmedNAC in
       log_debug ("Last element in trimmed: " ^ BS.show last_elt);
       (** TODO: Check this: wrong interpretation of append **)
-      let extension_len = clog_mu - (AC.length_BStr trimmedNAC - BS.length last_elt) in
+      let extension_len = !clog_mu - (AC.length_BStr trimmedNAC - BS.length last_elt) in
       log_debug ("Extension length: " ^ string_of_int extension_len);
       let extended_last = BS.extend last_elt extension_len in
       log_debug ("Extended last: " ^ BS.show extended_last);
@@ -315,7 +316,7 @@ module ProgressMeasure = struct
       let removed_last = AC.remove_last trimmed_to_nonempty in
       let last_in_shortened = AC.get_last removed_last in
       (** TODO: This is complicated lol make it easier to read **)
-      let extension_len = clog_mu - (AC.length_BStr removed_last - BS.length last_in_shortened) in
+      let extension_len = !clog_mu - (AC.length_BStr removed_last - BS.length last_in_shortened) in
       let extended_last = BS.extend last_in_shortened extension_len in
       AC.set_last removed_last extended_last;
       log_debug ("lift_ returned " ^ AC.show removed_last);
@@ -341,14 +342,16 @@ module ProgressMeasure = struct
   let get_AC pm node = Hashtbl.find pm node
 
   let is_edge_progressive pm pg n1 n2 =
+    let module AC = AdaptiveCounter in
     if Paritygame.ns_elem n2 (Paritygame.pg_get_successors pg n1) then
       let ac1 = Hashtbl.find pm n1 in 
       let ac2 = Hashtbl.find pm n2 in
       let p = Paritygame.pg_get_priority pg n1 in
-      let trimmed_ac1 = AdaptiveCounter.trim ac1 p in
-      let trimmed_ac2 = AdaptiveCounter.trim ac2 p in
-      if p mod 2 = 0 then AdaptiveCounter.compare trimmed_ac1 trimmed_ac2 >= 0
-      else AdaptiveCounter.compare trimmed_ac1 trimmed_ac2 > 0
+      let trimmed_ac1 = AC.trim ac1 p in
+      let trimmed_ac2 = AC.trim ac2 p in
+      if AC.is_max trimmed_ac1 && AC.is_max trimmed_ac2 then true
+      else if p mod 2 = 0 then AC.compare trimmed_ac1 trimmed_ac2 >= 0
+      else AC.compare trimmed_ac1 trimmed_ac2 > 0
     else 
       failwith "Non-existing edge cannot be progressive"
 
