@@ -18,6 +18,9 @@ module RegisterGame : sig
       |I| in the paper **)
   val s : int ref
 
+  (** Number of registers **)
+  val k : int ref
+
   (** Given a paritygame , convert to a register game
       with priorities bounded by log(n) + 1 where n is
       the number of nodes in the original game **)
