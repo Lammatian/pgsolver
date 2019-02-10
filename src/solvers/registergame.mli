@@ -82,7 +82,7 @@ module RegisterGame : sig
       of v in the original game, then we return the index
       of (v', x', 0), where x' are the updated registers after
       moving to a new vertex **)
-  val get_rg_neighbour : int -> Paritygame.node -> int
+  val get_rg_neighbour : int -> Paritygame.node -> Paritygame.paritygame -> int
 
   (** Given a paritygame , convert to a register game
       with priorities bounded by log(n) + 1 where n is
