@@ -85,7 +85,7 @@ module RegisterGame = struct
   let idx_to_desc i = 
     let v = idx_to_node i in
     let registers = idx_to_regs (i mod !s) in
-    let t = idx_to_t in
+    let t = idx_to_t i in
     (v, registers, t)
 
   let update_registers regs p =
@@ -147,7 +147,10 @@ module RegisterGame = struct
         (** Each possible register reset is a neighbour **)
         let rec get_reset_edges successors r =
           if r > !k then successors
-          else get_reset_edges ((i * !k + (r - 1)) :: successors) (r + 1)
+          (** We need Array.length rg_nodes because the index of
+              a reset node is shifted this much (they are considered
+              to have bigger indices than the non-reset nodes) **)
+          else get_reset_edges ((Array.length rg_nodes + i * !k + (r - 1)) :: successors) (r + 1)
         in
         let successors = skip :: get_reset_edges successors 1 in
         (prio, owner, successors, desc)
