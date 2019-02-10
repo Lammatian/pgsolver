@@ -127,7 +127,6 @@ module AdaptiveCounter = struct
   let last_index ac = (!d - 1) - 2 * (length ac - 1)
 
   let trim ac n =
-    (** TODO: Test this **)
     match ac with
     | Top -> Top
     | ACounter arr ->
@@ -141,7 +140,7 @@ module AdaptiveCounter = struct
 
   let compare ac1 ac2 =
     match ac1, ac2 with
-    | Top, Top -> 0 (** TODO: Check this: true because Top Top is progressive **)
+    | Top, Top -> 0
     | Top, ACounter arr -> 1
     | ACounter arr, Top -> -1
     | (ACounter arr1 as ac1), (ACounter arr2 as ac2) ->
@@ -176,7 +175,6 @@ module AdaptiveCounter = struct
 
   let trim_to_last_nonempty ac =
     match ac with
-    (** TODO: Test if this works lol **)
     | Top -> failwith "trim_to_last_nonempty called on AdaptiveCounter.Top"
     | ACounter arr -> 
       let i = ref (Array.length arr - 1) in
@@ -240,20 +238,45 @@ module ProgressMeasure = struct
     log_debug ("Size of the hashtable: " ^ (string_of_int (Hashtbl.length ht)));
     ht
 
+  let get_AC pm node = Hashtbl.find pm node
+
+  let is_edge_progressive pm pg n1 n2 =
+    let module AC = AdaptiveCounter in
+    if Paritygame.ns_elem n2 (Paritygame.pg_get_successors pg n1) then
+      let ac1 = Hashtbl.find pm n1 in 
+      let ac2 = Hashtbl.find pm n2 in
+      let p = Paritygame.pg_get_priority pg n1 in
+      let trimmed_ac1 = AC.trim ac1 p in
+      let trimmed_ac2 = AC.trim ac2 p in
+      if AC.is_max trimmed_ac1 && AC.is_max trimmed_ac2 then true
+      else if p mod 2 = 0 then AC.compare trimmed_ac1 trimmed_ac2 >= 0
+      else AC.compare trimmed_ac1 trimmed_ac2 > 0
+    else 
+      failwith "Non-existing edge cannot be progressive"
+
+  let is_node_progressive pm pg node =
+    let owner = Paritygame.pg_get_owner pg node in
+    let successors = Paritygame.pg_get_successors pg node in
+    if owner = Paritygame.plr_Even then
+      (** Exists **)
+      Paritygame.ns_exists (fun succ -> is_edge_progressive pm pg node succ) successors
+    else
+      (** For all **)
+      Paritygame.ns_forall (fun succ -> is_edge_progressive pm pg node succ) successors
+
   let lift_ pm pg node neighbour =
-    (** TODO: What if neighbourAC is top **)
     (** Page 14-15 of the paper **)
     log_debug ("Calling lift_ on the edge (" ^ nd_show node ^ "," ^ nd_show neighbour ^ ")");
     let module AC = AdaptiveCounter in
     let module BS = BString in
     let neighbourAC = Hashtbl.find pm neighbour in
     log_debug ("Neighbour's AC: " ^ AC.show neighbourAC);
-    if AC.is_max neighbourAC then
+    if is_edge_progressive pm pg node neighbour then
+      get_AC pm node
+    else if AC.is_max neighbourAC then
       AC.Top
     else
     let k = AC.last_index neighbourAC in
-    log_debug ("Value of k is " ^ string_of_int k);
-    log_debug ("Value of clog_mu is " ^ string_of_int !clog_mu);
     let p = Paritygame.pg_get_priority pg node in
     let trimmedNAC = AC.trim neighbourAC p in
     log_debug ("Neighbour's trimmed AC: " ^ AC.show trimmedNAC);
@@ -261,14 +284,11 @@ module ProgressMeasure = struct
     begin
       let ret = AC.max trimmedNAC (Hashtbl.find pm node) in
       log_debug ("Even priority, returning max: " ^ AC.show ret);
-      (** TODO: Check this but should be fine as trimmedNAC
-          is minimum required for it to be progressive **)
       ret
     end
     else if k > p then (** Append 0s to the total max length **)
     begin      
       log_debug "k is greater than priority, appending zeros";
-      (** TODO: Check if this works lol **)
       let toAppend = !clog_mu - AC.length_BStr neighbourAC in
       let appendedBS = BS.create_len toAppend in
       AC.append neighbourAC appendedBS
@@ -277,10 +297,7 @@ module ProgressMeasure = struct
     begin
       log_debug "AdaptiveCounter not fully filled in, filling in";
       let last_elt = AC.get_last trimmedNAC in
-      log_debug ("Last element in trimmed: " ^ BS.show last_elt);
-      (** TODO: Check this: wrong interpretation of append **)
       let extension_len = !clog_mu - (AC.length_BStr trimmedNAC - BS.length last_elt) in
-      log_debug ("Extension length: " ^ string_of_int extension_len);
       let extended_last = BS.extend last_elt extension_len in
       log_debug ("Extended last: " ^ BS.show extended_last);
       AC.set_last trimmedNAC extended_last;
@@ -339,32 +356,6 @@ module ProgressMeasure = struct
     log_debug ("New AC for that node is " ^ AC.show newAC);
     Hashtbl.replace pm node newAC
 
-  let get_AC pm node = Hashtbl.find pm node
-
-  let is_edge_progressive pm pg n1 n2 =
-    let module AC = AdaptiveCounter in
-    if Paritygame.ns_elem n2 (Paritygame.pg_get_successors pg n1) then
-      let ac1 = Hashtbl.find pm n1 in 
-      let ac2 = Hashtbl.find pm n2 in
-      let p = Paritygame.pg_get_priority pg n1 in
-      let trimmed_ac1 = AC.trim ac1 p in
-      let trimmed_ac2 = AC.trim ac2 p in
-      if AC.is_max trimmed_ac1 && AC.is_max trimmed_ac2 then true
-      else if p mod 2 = 0 then AC.compare trimmed_ac1 trimmed_ac2 >= 0
-      else AC.compare trimmed_ac1 trimmed_ac2 > 0
-    else 
-      failwith "Non-existing edge cannot be progressive"
-
-  let is_node_progressive pm pg node =
-    let owner = Paritygame.pg_get_owner pg node in
-    let successors = Paritygame.pg_get_successors pg node in
-    if owner = Paritygame.plr_Even then
-      (** Exists **)
-      Paritygame.ns_exists (fun succ -> is_edge_progressive pm pg node succ) successors
-    else
-      (** For all **)
-      Paritygame.ns_forall (fun succ -> is_edge_progressive pm pg node succ) successors
-
   let get_winning_set pm pg = 
     Paritygame.sol_init pg 
       (fun node ->
@@ -418,7 +409,7 @@ let solve' (pg : Paritygame.paritygame) : (Paritygame.solution * Paritygame.stra
     log_debug ("Picked non-progressive node " ^ nd_show non_prog_node);
     PM.lift pm pg non_prog_node;
     (** TODO: Optimise by keeping track of strategy **)
-    (** Add predecessors that became non-progressive to the stack **)
+    (** Add predecessors that became non-progressive to the list **)
     log_debug "Checking if predecessors became non-progressive";
     let pred = PG.pg_get_predecessors pg non_prog_node in
     nonprog := PG.ns_filter (fun node -> not (PM.is_node_progressive pm pg node)) pred |>

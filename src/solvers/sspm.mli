@@ -126,13 +126,6 @@ module ProgressMeasure : sig
       lowest possible AdaptiveCounter **)
   val create               : Paritygame.paritygame -> Paritygame.nodeset -> t
 
-  (** Lift method for making the given node progressive **)
-  val lift                 : t -> Paritygame.paritygame -> Paritygame.node -> unit
-
-  (** Helper lift method for determining the smallest
-      AdaptiveCounter making the edge progressive **)
-  val lift_                : t -> Paritygame.paritygame -> Paritygame.node -> Paritygame.node -> AdaptiveCounter.t
-
   (** Get AdaptiveCounter for the given node **)
   val get_AC               : t -> Paritygame.node -> AdaptiveCounter.t
 
@@ -142,6 +135,13 @@ module ProgressMeasure : sig
 
   (** Check if a given node is progressive **)
   val is_node_progressive  : t -> Paritygame.paritygame -> Paritygame.node -> bool
+
+  (** Lift method for making the given node progressive **)
+  val lift                 : t -> Paritygame.paritygame -> Paritygame.node -> unit
+
+  (** Helper lift method for determining the smallest
+      AdaptiveCounter making the edge progressive **)
+  val lift_                : t -> Paritygame.paritygame -> Paritygame.node -> Paritygame.node -> AdaptiveCounter.t
 
   (** Get the winning set for the given ProgressMeasure **)
   val get_winning_set      : t -> Paritygame.paritygame -> Paritygame.solution
