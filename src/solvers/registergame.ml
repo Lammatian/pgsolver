@@ -103,6 +103,7 @@ module RegisterGame = struct
     let n = PG.ns_size nodes in
     let n_float = float_of_int n in
     k := (log2 n_float) +. 1. |> ceil |> int_of_float;
+    (** TODO: Check if this actually finds the max priority **)
     p := PG.pg_max_prio pg;
     s := pow !p !k;
     (** TODO: Idea - mark with 'x' in description if a node has been
