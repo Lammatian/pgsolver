@@ -1,3 +1,9 @@
+open Basics
+
+let log_debug msg = message_autotagged 3 (fun _ -> "RGAME") (fun _ -> msg ^ "\n")
+let log_verb  msg = message_autotagged 2 (fun _ -> "RGAME") (fun _ -> msg ^ "\n") 
+let log_info  msg = message_autotagged 2 (fun _ -> "RGAME") (fun _ -> msg ^ "\n") 
+
 (** Helper functions because OCaml is poor **)
 let log2 x = log10 x /. log10 2.
 
@@ -11,35 +17,10 @@ let rec pow a = function
     let b = pow a (n / 2) in
     b * b * (if n mod 2 = 0 then 1 else a)
 
-module RegisterGame = struct
-  type t = Paritygame.paritygame
-
-  (** TODO: Check if priorities start from 0 **)
+module Converters = struct
   let s = ref 0
-
   let k = ref 0
-
   let p = ref 0
-
-  let idx_to_regs i =
-    (** Size of the domain for each register **)
-    let rd = !p + 1 in
-    let rec conv l x =
-      if x = 0 then
-        (** Finished, add trailing zeros to the result
-            to make it of length s **)
-        let len = !k - List.length l in
-        let trailing_zeros = Array.make len 0 in
-        (** TODO: Is this reversing really necessary or
-            could we avoid that? **)
-        let rev_list = List.rev l in
-        Array.append (Array.of_list rev_list) trailing_zeros
-      else
-        (** Add x % s to the beginning of the list and
-            divide x by s **)
-        conv ((x mod rd) :: l) (x / rd) 
-    in
-    conv [] i
 
   let regs_to_idx regs =
     let rd = !p + 1 in
@@ -80,13 +61,49 @@ module RegisterGame = struct
 
   let idx_to_node i = i / (2 * !s)
 
+  let idx_to_regs i =
+    (** Size of the domain for each register **)
+    let rd = !p + 1 in
+    let rec conv l x =
+      if x = 0 then
+        (** Finished, add trailing zeros to the result
+            to make it of length s **)
+        let len = !k - List.length l in
+        let trailing_zeros = Array.make len 0 in
+        (** TODO: Is this reversing really necessary or
+            could we avoid that? **)
+        let rev_list = List.rev l in
+        Array.append (Array.of_list rev_list) trailing_zeros
+      else
+        (** Add x % s to the beginning of the list and
+            divide x by s **)
+        conv ((x mod rd) :: l) (x / rd) 
+    in
+    conv [] (i mod !s)
+
   let idx_to_t i = if i mod (2 * !s) >= !s then 1 else 0
 
   let idx_to_desc i = 
     let v = idx_to_node i in
-    let registers = idx_to_regs (i mod !s) in
+    let registers = idx_to_regs i in
     let t = idx_to_t i in
     (v, registers, t)
+
+  let string_of_desc v regs t =
+    let str_v = string_of_int v in
+    let str_regs = "[" ^ String.concat "," (Array.map string_of_int regs |> Array.to_list) ^ "]" in
+    let str_t = string_of_int t in
+    "(" ^ String.concat ", " [str_v; str_regs; str_t] ^ ")"
+end
+
+module RegisterGame = struct
+  open Converters
+  type t = Paritygame.paritygame
+
+  (** TODO: Check if priorities start from 0 **)
+  let s = ref 0
+  let k = ref 0
+  let p = ref 0
 
   let update_registers regs p =
     Array.map (fun r -> max r p) regs
@@ -97,21 +114,30 @@ module RegisterGame = struct
     let updated_registers = update_registers registers priority_in_g in
     desc_to_idx neighbour_in_g updated_registers 0
 
-  let convert pg =
+  let create pg =
     let module PG = Paritygame in
     let nodes = PG.collect_nodes pg (fun _ _ -> true) in
     let n = PG.ns_size nodes in
     let n_float = float_of_int n in
     k := (log2 n_float) +. 1. |> ceil |> int_of_float;
+    Converters.k := !k;
     (** TODO: Check if this actually finds the max priority **)
     p := PG.pg_max_prio pg;
-    s := pow !p !k;
+    Converters.p := !p;
+    log_debug ("Max priority: " ^ string_of_int !p);
+    s := pow (!p + 1) !k;
+    Converters.s := !s;
+    log_debug ("k: " ^ string_of_int !k);
+    log_debug ("p: " ^ string_of_int !p);
+    log_debug ("s: " ^ string_of_int !s);
     (** TODO: Idea - mark with 'x' in description if a node has been
         visited, to then easily remove nodes with in-degree 0 **)
     (** TODO: Making separate HUGE arrays and then combining them
         doesn't seem like the best idea, try to make one array **)
-    let rg_nodes = Array.make (n * !s) (0, PG.plr_undef, [], None) in
-    (** Add all non-reset nodes with appripriate priority and owner **)
+    log_debug "Creating non-reset nodes";
+    let rg_nodes = Array.make (n * 2 * !s) (0, PG.plr_undef, [], None) in
+    (** Add all non-reset nodes with appripriate priority and owner.
+        If verbosity at least 2, add description as well **)
     PG.ns_iter (fun node ->
       for j = 0 to 2 * !s - 1 do
         (** The owner is Even if in a non-move node (t = 0),
@@ -119,10 +145,14 @@ module RegisterGame = struct
         let owner = if j < !s then PG.plr_Even else PG.pg_get_owner pg node in
         (** Priority depends on the owner **)
         let priority = if owner = PG.plr_Even then 0 else 1 in
-        rg_nodes.(j) <- (priority, owner, [], None)
+        (** Add description if verbosity >= 2 **)
+        let desc = if !Basics.verbosity >= 2 then Some (string_of_desc node (idx_to_regs j) (idx_to_t j)) else None in
+        log_debug ("Desc: " ^ match desc with Some x -> x | None -> "");
+        rg_nodes.(node * 2 * !s + j) <- (priority, owner, [], desc)
       done;)
       nodes;
     (** Reset node creation with appropriate successors (one for each) **)
+    log_debug "Creating reset nodes";
     let reset_nodes = Array.make (Array.length rg_nodes * !k) (0, PG.plr_undef, [], None) in
     Array.iteri (fun i _ ->
       for r = 1 to !k do
@@ -130,14 +160,19 @@ module RegisterGame = struct
         let owner = PG.plr_Even in
         (** Determine the register contents of the node i **)
         let registers = idx_to_regs i in
+        log_debug "before1";
         let priority = if registers.(r - 1) mod 2 = 0 then 2*r else 2*r + 1 in
+        log_debug "after1";
         (** Get the successor after reset **)
         let underlying_node = idx_to_node i in
         let successor = desc_to_idx_reset underlying_node registers r in
-        reset_nodes.(i * !k + r) <- (priority, owner, [successor], None)
+        let desc = if !Basics.verbosity >= 2 then Some ("r" ^ string_of_int r ^ string_of_desc underlying_node registers 0) else None in
+        log_debug "before2";
+        reset_nodes.(i * !k + r - 1) <- (priority, owner, [successor], desc)
       done)
       rg_nodes;
     (** Adding successors to all non-reset nodes **)
+    log_debug "Adding successors to non-reset nodes";
     let rg_nodes = Array.mapi (fun i (prio, owner, succ, desc) ->
       let t = idx_to_t i in 
       let successors = succ in
@@ -182,6 +217,8 @@ module RegisterGame = struct
 end
 
 let solve game = 
+  let rg = RegisterGame.create game in
+  Paritygame.print_game rg;
   (Paritygame.sol_make 0, Paritygame.str_make 0)
 
 let register () =
