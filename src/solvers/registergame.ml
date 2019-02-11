@@ -27,7 +27,7 @@ module Converters = struct
     let result = ref 0 in
     let mult = ref 1 in
     for i = 0 to Array.length regs - 1 do
-      result := regs.(i) * !mult;
+      result := !result + regs.(i) * !mult;
       mult := !mult * rd;
     done;
     !result
@@ -160,14 +160,11 @@ module RegisterGame = struct
         let owner = PG.plr_Even in
         (** Determine the register contents of the node i **)
         let registers = idx_to_regs i in
-        log_debug "before1";
         let priority = if registers.(r - 1) mod 2 = 0 then 2*r else 2*r + 1 in
-        log_debug "after1";
         (** Get the successor after reset **)
         let underlying_node = idx_to_node i in
         let successor = desc_to_idx_reset underlying_node registers r in
         let desc = if !Basics.verbosity >= 2 then Some ("r" ^ string_of_int r ^ string_of_desc underlying_node registers 0) else None in
-        log_debug "before2";
         reset_nodes.(i * !k + r - 1) <- (priority, owner, [successor], desc)
       done)
       rg_nodes;
