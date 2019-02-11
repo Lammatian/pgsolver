@@ -1,19 +1,9 @@
 val solve : Paritygame.paritygame -> Paritygame.solution * Paritygame.strategy
 val register: unit -> unit
 
-module RegisterGame : sig
-  (** Module for working with register games. The register
-      games are represented as normal parity games, as
-      described in 
-      https://www.informatik.uni-kiel.de/~kleh/register-index.pdf
-      
-      We are assuming so far that nodes in the original game
-      have consecutive indices starting from 0 (which I believe
-      is actually the case) and that the priorities start
-      from 0 **)
-
-  type t
-
+(** Module for conversion between indices and register
+    game information. **)
+module Converters : sig
   (** The size of the set of priorities of the original game,
       |I| in the paper **)
   val s : int ref
@@ -69,6 +59,30 @@ module RegisterGame : sig
       x is the content of the registers
       t is the indicator for reset/move **)
   val idx_to_desc : Paritygame.node -> int * int array * int
+end
+
+module RegisterGame : sig
+  (** Module for working with register games. The register
+      games are represented as normal parity games, as
+      described in 
+      https://www.informatik.uni-kiel.de/~kleh/register-index.pdf
+      
+      We are assuming so far that nodes in the original game
+      have consecutive indices starting from 0 (which I believe
+      is actually the case) and that the priorities start
+      from 0 **)
+
+  type t
+
+  (** The size of the set of priorities of the original game,
+      |I| in the paper **)
+  val s : int ref
+
+  (** Number of registers **)
+  val k : int ref
+
+  (** Max priority in the game and consequently |I| - 1 **)
+  val p : int ref
 
   (** Given registers and a priority of a new node to
       visit, update each register to hold the max value
@@ -84,10 +98,10 @@ module RegisterGame : sig
       moving to a new vertex **)
   val get_rg_neighbour : int -> Paritygame.node -> Paritygame.paritygame -> int
 
-  (** Given a paritygame , convert to a register game
+  (** Given a paritygame  convert to a register game
       with priorities bounded by log(n) + 1 where n is
       the number of nodes in the original game **)
-  val convert     : Paritygame.paritygame -> t
+  val create      : Paritygame.paritygame -> t
 
   (** Recover a solution for the original game from the 
       solved register game **)
