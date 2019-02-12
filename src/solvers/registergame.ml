@@ -276,9 +276,9 @@ module RegisterGame = struct
     PG.pg_init (Array.length cleared_up_nodes)
       (fun node -> cleared_up_nodes.(node))
 
-  let recover_sol rg = Paritygame.sol_make 0
+  let recover_sol rg_sol = Paritygame.sol_make 0
 
-  let recover_str rg = Paritygame.str_make 0
+  let recover_str rg_str = Paritygame.str_make 0
 end
 
 let underlying_solver : Paritygame.global_solver ref = ref Recursive.solve
@@ -286,7 +286,9 @@ let underlying_solver : Paritygame.global_solver ref = ref Recursive.solve
 let solve game = 
   let rg = RegisterGame.create game in
   if !Basics.verbosity >= 2 then Paritygame.print_game rg;
-  !underlying_solver rg
+  let rg_sol, rg_str = !underlying_solver rg in
+  if !Basics.verbosity >= 2 then Paritygame.print_solution_strategy_parsable rg_sol rg_str;
+  (RegisterGame.recover_sol rg_sol, RegisterGame.recover_str rg_str)
 
 module CommandLine = struct
   let speclist =  [(["--solver"; "-s"], String (fun i -> 

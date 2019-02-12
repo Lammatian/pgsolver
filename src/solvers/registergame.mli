@@ -113,10 +113,10 @@ module RegisterGame : sig
   val create      : Paritygame.paritygame -> t
 
   (** Recover a solution for the original game from the 
-      solved register game **)
-  val recover_sol : t -> Paritygame.solution
+      solution for the register game **)
+  val recover_sol : Paritygame.solution -> Paritygame.solution
 
   (** Recover a strategy for the original game from the 
-      solved register game **)
-  val recover_str : t -> Paritygame.strategy
+      strategy for the register game **)
+  val recover_str : Paritygame.strategy -> Paritygame.strategy
 end
