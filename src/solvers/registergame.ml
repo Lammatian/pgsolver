@@ -42,8 +42,10 @@ module Converters = struct
     let mult = ref rd in
     for i = 0 to Array.length regs - 1 do
       if i <> r - 1 then
-        result := regs.(i) * !mult;
+      begin
+        result := !result + regs.(i) * !mult;
         mult := !mult * rd;
+      end
     done;
     !result
 
@@ -114,6 +116,72 @@ module RegisterGame = struct
     let updated_registers = update_registers registers priority_in_g in
     desc_to_idx neighbour_in_g updated_registers 0
 
+  (** TODO: Some examples created by bin/randomgame aren't
+      necessarily in this form. Check if this is even necessary
+      or can this step be ignored **)
+  let remove_unnecessary_nodes pg rg_nodes reset_nodes =
+    let visited = Array.make (Array.length rg_nodes + Array.length reset_nodes) false in
+    let visited_count = ref 0 in
+    (** Find max priority vertex v and the according register game 
+        vertex (v, [pi(v), ..., pi(v)], 0) which will definitely be
+        visited infinitely often **)
+    let max_prio_node = Paritygame.pg_max_prio_node pg in
+    let max_prio_idx = desc_to_idx max_prio_node (Array.make !k !p) 0 in
+    visited.(max_prio_idx) <- true;
+    visited_count := !visited_count + 1;
+    let max_prio_rgnode = rg_nodes.(max_prio_idx) in
+    log_debug "Traversing the graph";
+    (** Graph traversal **)
+    let stack = Stack.create () in
+    Stack.push max_prio_rgnode stack;
+    while not (Stack.is_empty stack) do
+      let _, _, succ, _ = Stack.pop stack in
+      let rec update_stack = function
+        | [] -> ()
+        | hd :: tl ->
+          (** Mark visited **)
+          if not (visited.(hd)) then
+          begin
+            visited.(hd) <- true;
+            visited_count := !visited_count + 1;
+            let next =
+              if hd < Array.length rg_nodes then rg_nodes.(hd)
+              else reset_nodes.(hd - Array.length rg_nodes)
+            in
+            Stack.push next stack
+          end;
+          update_stack tl
+      in
+      update_stack succ
+    done;
+    let cleared_up = Array.make !visited_count (0, Paritygame.plr_undef, [], None) in
+    let mapping = Hashtbl.create !visited_count in
+    visited_count := 0;
+    (** Create cleared up array of nodes and a new mapping **)
+    log_debug "Creating a cleared up array of nodes and a map for successors";
+    for i = 0 to (Array.length rg_nodes + Array.length reset_nodes - 1) do
+      if visited.(i) then
+      begin
+        cleared_up.(!visited_count) <-
+          if i < Array.length rg_nodes then rg_nodes.(i)
+          else reset_nodes.(i - Array.length rg_nodes);
+        (** Remember that old idx i is now index !visited_count **)
+        Hashtbl.add mapping i !visited_count;
+        visited_count := !visited_count + 1;
+      end
+    done;
+    (** Update all successors using the mapping **)
+    log_debug "Updating successors";
+    for i = 0 to (Array.length cleared_up - 1) do
+      let v, o, succ, desc = cleared_up.(i) in
+      let rec update_successors = function
+        | [] -> []
+        | hd :: tl -> Hashtbl.find mapping hd :: update_successors tl
+      in
+      cleared_up.(i) <- (v, o, update_successors succ, desc);
+    done;
+    cleared_up
+
   let create pg =
     let module PG = Paritygame in
     let nodes = PG.collect_nodes pg (fun _ _ -> true) in
@@ -165,6 +233,7 @@ module RegisterGame = struct
         let underlying_node = idx_to_node i in
         let successor = desc_to_idx_reset underlying_node registers r in
         let desc = if !Basics.verbosity >= 2 then Some ("r" ^ string_of_int r ^ string_of_desc underlying_node registers 0) else None in
+        log_debug ("Desc: " ^ match desc with Some x -> x | None -> "");
         reset_nodes.(i * !k + r - 1) <- (priority, owner, [successor], desc)
       done)
       rg_nodes;
@@ -199,14 +268,11 @@ module RegisterGame = struct
       )
       rg_nodes 
     in
+    log_debug "Removing unnecessary nodes from the graph";
+    let cleared_up_nodes = remove_unnecessary_nodes pg rg_nodes reset_nodes in
     (** Initialise the game **)
-    PG.pg_init (Array.length rg_nodes + Array.length reset_nodes)
-      (fun node ->
-        if node < Array.length rg_nodes then
-          rg_nodes.(node)
-        else
-          reset_nodes.(node - Array.length rg_nodes)
-      )
+    PG.pg_init (Array.length cleared_up_nodes)
+      (fun node -> cleared_up_nodes.(node))
 
   let recover_sol rg = Paritygame.sol_make 0
 
@@ -215,7 +281,7 @@ end
 
 let solve game = 
   let rg = RegisterGame.create game in
-  Paritygame.print_game rg;
+  if !Basics.verbosity >= 2 then Paritygame.print_game rg;
   (Paritygame.sol_make 0, Paritygame.str_make 0)
 
 let register () =
