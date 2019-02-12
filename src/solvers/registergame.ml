@@ -1,4 +1,6 @@
 open Basics
+open Arg
+open Tcsargs
 
 let log_debug msg = message_autotagged 3 (fun _ -> "RGAME") (fun _ -> msg ^ "\n")
 let log_verb  msg = message_autotagged 2 (fun _ -> "RGAME") (fun _ -> msg ^ "\n") 
@@ -279,14 +281,30 @@ module RegisterGame = struct
   let recover_str rg = Paritygame.str_make 0
 end
 
+let underlying_solver : Paritygame.global_solver ref = ref Recursive.solve
+
 let solve game = 
   let rg = RegisterGame.create game in
   if !Basics.verbosity >= 2 then Paritygame.print_game rg;
-  (Paritygame.sol_make 0, Paritygame.str_make 0)
+  !underlying_solver rg
+
+module CommandLine = struct
+  let speclist =  [(["--solver"; "-s"], String (fun i -> 
+                        let (global_fact, _, _) = Solverregistry.find_solver i in
+                        underlying_solver := global_fact [|""|]),
+                      "<solver>\n     set underlying solver (default is recursive)");
+                      ]
+
+  let parse s = 
+  	SimpleArgs.parsearr s speclist (fun _ -> ()) "Register Game\n" SimpleArgs.argprint_help SimpleArgs.argprint_bad
+end ;;
+
+
+open CommandLine ;;
 
 let register () =
-  Solverregistry.register_solver
-    solve
+  Solverregistry.register_solver_factory
+    (fun s -> parse s; solve)
     "registergame"
     "rg" (** TODO: Make sure doesn't clash with anything **)
-    "Quasi-polynomial time algorithm by Jurdzinski and Lazic (2017)"
+    "Converter to an equivalent game with O(log n) bound on priorities but n^(log n) nodes"
