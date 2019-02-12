@@ -98,6 +98,15 @@ module RegisterGame : sig
       moving to a new vertex **)
   val get_rg_neighbour : int -> Paritygame.node -> Paritygame.paritygame -> int
 
+  (** Given the nodes of a register game, clear up all the
+      unnecessary nodes, i.e. the nodes that won't be visited 
+      in the long run of the game. **) 
+  val remove_unnecessary_nodes : 
+    Paritygame.paritygame ->
+    (int * Paritygame.player * int list * string option) array -> 
+    (int * Paritygame.player * int list * string option) array -> 
+    (int * Paritygame.player * int list * string option) array
+
   (** Given a paritygame  convert to a register game
       with priorities bounded by log(n) + 1 where n is
       the number of nodes in the original game **)
