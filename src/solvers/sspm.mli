@@ -111,6 +111,11 @@ module AdaptiveCounter : sig
       equal and 1 if the first is bigger **)
   val compare     : t -> t -> int
 
+  (** Trim and compare two AdaptiveCounters with each 
+      other, returning -1 if first is smaller, 0 if 
+      they're equal and 1 if the first is bigger **)
+  val compare2    : t -> t -> int -> int
+
   (** Append a BString to the end of the AdaptiveCounter **)
   val append      : t -> BString.t -> t
 

@@ -258,6 +258,26 @@ module AdaptiveCounter = struct
     else if !ret = 0 && length ac1 > length ac2 then 1
     else !ret
 
+  let compare2 ac1 ac2 pi =
+    match ac1, ac2 with
+    | Top, Top -> 0
+    | Top, ACounter arr -> 1
+    | ACounter arr, Top -> -1
+    | (ACounter arr1 as ac1), (ACounter arr2 as ac2) ->
+      (*print_string "Comparing "; print_string (show ac1); print_string " and "; print_string (show ac2); print_newline ();*)
+      let rec comp idx =
+        if !d - 2 * idx - 1 < pi then 0
+        else if idx >= length ac1 then (if idx >= length ac2 then 0 else -1)
+        else if idx >= length ac2 then 1
+        else
+          let bcomp = BString.compare arr1.(idx) arr2.(idx) in
+          if bcomp <> 0 then bcomp
+          else comp (idx + 1)
+      in
+      let result = comp 0 in
+      (*print_string "Result: "; print_int result; print_newline ();*)
+      result
+
   let max ac1 ac2 =
     if compare ac1 ac2 > 0 then ac1 else ac2
 
@@ -351,11 +371,14 @@ module ProgressMeasure = struct
       let ac1 = get_AC pm n1 in 
       let ac2 = get_AC pm n2 in
       let p = Paritygame.pg_get_priority pg n1 in
-      let trimmed_ac1 = AC.trim ac1 p in
+      if AC.is_max ac1 && AC.is_max ac2 then true
+      else if p mod 2 = 0 then AC.compare2 ac1 ac2 p >= 0
+      else AC.compare2 ac1 ac2 p > 0
+      (*let trimmed_ac1 = AC.trim ac1 p in
       let trimmed_ac2 = AC.trim ac2 p in
       if AC.is_max trimmed_ac1 && AC.is_max trimmed_ac2 then true
       else if p mod 2 = 0 then AC.compare trimmed_ac1 trimmed_ac2 >= 0
-      else AC.compare trimmed_ac1 trimmed_ac2 > 0
+      else AC.compare trimmed_ac1 trimmed_ac2 > 0*)
     else 
       failwith "Non-existing edge cannot be progressive"
 
@@ -503,7 +526,7 @@ let solve' (pg : Paritygame.paritygame) : (Paritygame.solution * Paritygame.stra
   let nodes = PG.collect_nodes pg (fun _ _ -> true) in
   let pm = PM.create pg nodes in
   (** Get all non-progressive **)
-  let nonprog = ref (PG.ns_filter (fun node -> not (PM.is_node_progressive pm pg node)) nodes) in
+  let nonprog = ref (PG.ns_filter (fun node -> PG.pg_get_priority pg node mod 2 = 1) nodes) in
   (** Call lift on non-progressive until all progressive **)
   while not (PG.ns_isEmpty !nonprog) do
     (* log_debug ("### New loop: " ^ string_of_int (PG.ns_size !nonprog) ^ " non-progressive"); *)
@@ -513,24 +536,20 @@ let solve' (pg : Paritygame.paritygame) : (Paritygame.solution * Paritygame.stra
     nonprog := PG.ns_del non_prog_node !nonprog;
     (* log_debug ("Picked non-progressive node " ^ nd_show non_prog_node); *)
     PM.lift pm pg non_prog_node;
-    (** TODO: Optimise by keeping track of strategy **)
     (** Add predecessors that became non-progressive to the list **)
     (* log_debug "Checking if predecessors became non-progressive"; *)
     let pred = PG.pg_get_predecessors pg non_prog_node in
     PG.ns_iter (fun node ->
       if PG.pg_get_owner pg node = PG.plr_Odd then
       begin
-        if not (PM.is_edge_progressive pm pg node non_prog_node) then nonprog := PG.ns_add node !nonprog
+        if not (PM.is_edge_progressive pm pg node non_prog_node) 
+        then nonprog := PG.ns_add node !nonprog
       end
       else
       begin
-        if not (PM.is_node_progressive pm pg node) then nonprog := PG.ns_add node !nonprog;
+        if not (PM.is_node_progressive pm pg node) 
+        then nonprog := PG.ns_add node !nonprog
       end) pred;
-    (*PG.ns_iter (fun node -> 
-      if not (PM.is_node_progressive pm pg node |> fst) then nonprog := PG.ns_add node !nonprog)
-      pred;*)
-    (*nonprog := PG.ns_filter (fun node -> not (PM.is_node_progressive pm pg node)) pred |>
-               PG.ns_fold (fun acc node -> PG.ns_add node acc) !nonprog;*)
   done;
   log_info "All nodes progressive, finishing up";
   let sol = PM.get_winning_set pm pg in
