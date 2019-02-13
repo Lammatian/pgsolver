@@ -258,7 +258,7 @@ module AdaptiveCounter = struct
     else if !ret = 0 && length ac1 > length ac2 then 1
     else !ret
 
-  let compare2 ac1 ac2 pi =
+  let trim_compare ac1 ac2 pi =
     match ac1, ac2 with
     | Top, Top -> 0
     | Top, ACounter arr -> 1
@@ -367,20 +367,12 @@ module ProgressMeasure = struct
 
   let is_edge_progressive pm pg n1 n2 =
     let module AC = AdaptiveCounter in
-    if Paritygame.ns_elem n2 (Paritygame.pg_get_successors pg n1) then
-      let ac1 = get_AC pm n1 in 
-      let ac2 = get_AC pm n2 in
-      let p = Paritygame.pg_get_priority pg n1 in
-      if AC.is_max ac1 && AC.is_max ac2 then true
-      else if p mod 2 = 0 then AC.compare2 ac1 ac2 p >= 0
-      else AC.compare2 ac1 ac2 p > 0
-      (*let trimmed_ac1 = AC.trim ac1 p in
-      let trimmed_ac2 = AC.trim ac2 p in
-      if AC.is_max trimmed_ac1 && AC.is_max trimmed_ac2 then true
-      else if p mod 2 = 0 then AC.compare trimmed_ac1 trimmed_ac2 >= 0
-      else AC.compare trimmed_ac1 trimmed_ac2 > 0*)
-    else 
-      failwith "Non-existing edge cannot be progressive"
+    let ac1 = get_AC pm n1 in 
+    let ac2 = get_AC pm n2 in
+    let p = Paritygame.pg_get_priority pg n1 in
+    if AC.is_max ac1 && AC.is_max ac2 then true
+    else if p mod 2 = 0 then AC.trim_compare ac1 ac2 p >= 0
+    else AC.trim_compare ac1 ac2 p > 0
 
   let is_node_progressive pm pg node =
     let owner = Paritygame.pg_get_owner pg node in
@@ -399,9 +391,7 @@ module ProgressMeasure = struct
     let module BS = BString in
     let neighbourAC = get_AC pm neighbour in
     (* log_debug ("Neighbour's AC: " ^ AC.show neighbourAC); *)
-    if is_edge_progressive pm pg node neighbour then
-      get_AC pm node
-    else if AC.is_max neighbourAC then
+    if AC.is_max neighbourAC then
       AC.Top
     else
     let k = AC.last_index neighbourAC in
