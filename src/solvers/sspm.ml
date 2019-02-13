@@ -327,9 +327,6 @@ module AdaptiveCounter = struct
   let is_empty ac = length ac = 0
 end
 
-(** Helper function since OCaml is poor **)
-let log2 x = log10 x /. log10 2.
-
 module ProgressMeasure = struct
   type t = AdaptiveCounter.t array
 
@@ -532,12 +529,12 @@ let solve' (pg : Paritygame.paritygame) : (Paritygame.solution * Paritygame.stra
     PG.ns_iter (fun node ->
       if PG.pg_get_owner pg node = PG.plr_Odd then
       begin
-        if not (PM.is_edge_progressive pm pg node non_prog_node) 
+        if not (PM.is_edge_progressive pm pg node non_prog_node)
         then nonprog := PG.ns_add node !nonprog
       end
       else
       begin
-        if not (PM.is_node_progressive pm pg node) 
+        if not (PM.is_node_progressive pm pg node)
         then nonprog := PG.ns_add node !nonprog
       end) pred;
   done;

@@ -156,6 +156,9 @@ module ProgressMeasure : sig
   (** Number of nodes with odd priority **)
   val mu : int ref
 
+  (** ceil(log2(mu)) **)
+  val clog_mu : int ref
+
   (** Size of the ProgressMeasure i.e. the number of nodes **)
   val size : t -> int
 
