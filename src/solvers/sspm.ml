@@ -5,6 +5,95 @@ let log_debug msg = message_autotagged 3 (fun _ -> "SSPM") (fun _ -> msg ^ "\n")
 let log_verb msg = message_autotagged 2 (fun _ -> "SSPM") (fun _ -> msg ^ "\n") ;;
 let log_info msg = message_autotagged 2 (fun _ -> "SSPM") (fun _ -> msg ^ "\n") ;;
 
+let log2 x = log10 x /. log10 2.
+let clog2 x = float_of_int x |> log2 |> ceil |> int_of_float
+let binary_length x = clog2 (x + 1)
+let rec pow a = function
+  | 0 -> 1
+  | 1 -> a
+  | n -> 
+    let b = pow a (n / 2) in
+    b * b * (if n mod 2 = 0 then 1 else a)
+
+module BString2 = struct
+  type t = BString of int * int | Empty
+
+  let create x y =
+    if y = 0 then Empty else BString (x, y)
+
+  let create_len y = create 0 y
+
+  let show = function
+    | Empty -> "ε"
+    | BString (x, y) ->
+      let leading_zeros = String.make (y - binary_length x) '0' in
+      let rec convert x s =
+        if x > 0 then convert (x / 2) s ^ (x mod 2 |> string_of_int) else ""
+      in
+      leading_zeros ^ convert x ""
+
+  let print bstr = show bstr |> print_string
+
+  let length = function
+    | Empty -> 0
+    | BString (x, y) -> y
+
+  let extend bstr n =
+    if length bstr < n then
+      match bstr with
+        | Empty -> BString (pow 2 (n - 1), n)
+        | BString (x, y) ->
+          BString (x lsl (n - y) + pow 2 (n - y - 1), n)
+    else
+      bstr
+  
+  let cut = function
+    | Empty -> Empty
+    | BString (x, y) ->
+      let rec cut_ones x y =
+        if y = 0 then Empty
+        else if x mod 2 = 1 then cut_ones (x asr 1) (y - 1) 
+        else if y = 1 then Empty
+        else BString (x asr 1, y - 1)
+      in
+      cut_ones x y
+
+  let is_max = function
+    | Empty -> false
+    | BString (x, y) ->
+      let rec loop x y =
+        if x mod 2 = 0 then false
+        else if x = 1 then y = 1
+        else loop (x asr 1) (y - 1)
+      in
+      loop x y
+  
+  let is_empty = function
+    | Empty -> true
+    | BString _ -> false
+
+  let compare b1 b2 =
+    match b1, b2 with
+    | Empty, Empty          -> 0
+    | Empty, BString (x, y) -> if binary_length x = y then -1 else 1
+    | BString (x, y), Empty -> if binary_length x = y then 1 else -1
+    | BString (x1, y1), BString (x2, y2) ->
+      let zeros1 = y1 - binary_length x1 in
+      let zeros2 = y2 - binary_length x2 in
+      if zeros1 < zeros2 then 1
+      else if zeros1 > zeros2 then -1
+      else
+        let extension = max y1 y2 in
+        let ext_x1 = x1 lsl (extension - binary_length x1) in
+        let ext_x2 = x2 lsl (extension - binary_length x2) in
+        if ext_x1 > ext_x2 then 1
+        else if ext_x1 = ext_x2 then
+          if y1 > y2 then -1
+          else if y1 = y2 then 0
+          else 1
+        else -1
+end
+
 module BString = struct
   type t = BString of bool list | Empty
 

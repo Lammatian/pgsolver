@@ -3,6 +3,41 @@
 val solve : Paritygame.paritygame -> Paritygame.solution * Paritygame.strategy
 val register: unit -> unit
 
+module BString2 : sig
+  type t
+  (** Create BString from a list of booleans **)
+  val create     : int -> int -> t
+
+  (** Create BString of all 0s of length of the first argument **)
+  val create_len : int -> t
+
+  (** Returns the string representation of the BString **)
+  val show       : t -> string
+
+  (** Prints the BString to the standard output **)
+  val print      : t -> unit
+
+  (** Get the length of the bstring **)
+  val length     : t -> int
+
+  (** Extends the BString with 10...0 to a total length of the second argument **)
+  val extend     : t -> int -> t
+
+  (** Cut the last 01...1 from the BString **)
+  val cut        : t -> t
+
+  (** Check if BString is maximal of its length (i.e. only 1s) **)
+  val is_max     : t -> bool
+
+  (** Check if BString is empty **)
+  val is_empty   : t -> bool
+
+  (** Compare two BStrings with each other, returning
+      -1 if first is smaller, 0 if they're equal and
+      1 if first is bigger than the second one **)
+  val compare    : t -> t -> int
+end
+
 module BString : sig
   type t
   (** Create BString from a list of booleans **)
