@@ -8,14 +8,16 @@ let log_info msg = message_autotagged 2 (fun _ -> "SSPM") (fun _ -> msg ^ "\n") 
 let log2 x = log10 x /. log10 2.
 let clog2 x = float_of_int x |> log2 |> ceil |> int_of_float
 let binary_length x = clog2 (x + 1)
+(** TODO: You are only using pow 2 so use lsl **)
 let rec pow a = function
   | 0 -> 1
   | 1 -> a
   | n -> 
     let b = pow a (n / 2) in
     b * b * (if n mod 2 = 0 then 1 else a)
+let pow2 n = 1 lsl n
 
-module BString2 = struct
+module BString = struct
   type t = BString of int * int | Empty
 
   let create x y =
@@ -41,9 +43,9 @@ module BString2 = struct
   let extend bstr n =
     if length bstr < n then
       match bstr with
-        | Empty -> BString (pow 2 (n - 1), n)
+        | Empty -> BString (pow2 (n - 1), n)
         | BString (x, y) ->
-          BString (x lsl (n - y) + pow 2 (n - y - 1), n)
+          BString (x lsl (n - y) + pow2 (n - y - 1), n)
     else
       bstr
   
@@ -73,6 +75,7 @@ module BString2 = struct
     | BString _ -> false
 
   let compare b1 b2 =
+    log_debug ("Comparing " ^ show b1 ^ " and " ^ show b2);
     match b1, b2 with
     | Empty, Empty          -> 0
     | Empty, BString (x, y) -> if binary_length x = y then -1 else 1
@@ -82,19 +85,24 @@ module BString2 = struct
       let zeros2 = y2 - binary_length x2 in
       if zeros1 < zeros2 then 1
       else if zeros1 > zeros2 then -1
+      else if x1 = x2 then 0
       else
-        let extension = max y1 y2 in
-        let ext_x1 = x1 lsl (extension - binary_length x1) in
-        let ext_x2 = x2 lsl (extension - binary_length x2) in
-        if ext_x1 > ext_x2 then 1
-        else if ext_x1 = ext_x2 then
-          if y1 > y2 then -1
-          else if y1 = y2 then 0
-          else 1
-        else -1
+      begin
+        let cut_len = min (binary_length x1) (binary_length x2) in
+        let cut_x1 = x1 asr (binary_length x1 - cut_len) in
+        let cut_x2 = x2 asr (binary_length x2 - cut_len) in
+        if cut_x1 > cut_x2 then 1
+        else if cut_x1 < cut_x2 then -1
+        else if cut_x1 = x1 then
+          let check = pow2 (binary_length x2 - cut_len - 1) in
+          if x2 land check <> 0 then -1 else 1
+        else
+          let check = pow2 (binary_length x1 - cut_len - 1) in
+          if x1 land check <> 0 then 1 else -1
+      end
 end
 
-module BString = struct
+module BString2 = struct
   type t = BString of bool list | Empty
 
   let create = function
@@ -237,6 +245,7 @@ module AdaptiveCounter = struct
     let ret = ref 0 in
     while !ret = 0 && !i < length ac1 && !i < length ac2 do
       ret := BString.compare arr1.(!i) arr2.(!i);
+      log_debug ("Returned " ^ string_of_int !ret);
       i := !i + 1
     done;
     if !ret = 0 && length ac1 < length ac2 then -1

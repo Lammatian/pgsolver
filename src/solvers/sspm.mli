@@ -3,7 +3,7 @@
 val solve : Paritygame.paritygame -> Paritygame.solution * Paritygame.strategy
 val register: unit -> unit
 
-module BString2 : sig
+module BString : sig
   type t
   (** Create BString from a list of booleans **)
   val create     : int -> int -> t
@@ -38,7 +38,7 @@ module BString2 : sig
   val compare    : t -> t -> int
 end
 
-module BString : sig
+module BString2 : sig
   type t
   (** Create BString from a list of booleans **)
   val create     : bool list -> t
