@@ -100,23 +100,28 @@ module RegisterGame : sig
 
   (** Given the nodes of a register game, clear up all the
       unnecessary nodes, i.e. the nodes that won't be visited 
-      in the long run of the game. **) 
+      in the long run of the game. Returns the cleared up game
+      as well as the mapping from the new game to the old **) 
   val remove_unnecessary_nodes : 
     Paritygame.paritygame ->
     (int * Paritygame.player * int list * string option) array -> 
     (int * Paritygame.player * int list * string option) array -> 
-    (int * Paritygame.player * int list * string option) array
+    (int * Paritygame.player * int list * string option) array * int array
 
   (** Given a paritygame  convert to a register game
       with priorities bounded by log(n) + 1 where n is
       the number of nodes in the original game **)
-  val create      : Paritygame.paritygame -> t
+  val create      : Paritygame.paritygame -> t * int array
 
-  (** Recover a solution for the original game from the 
-      solution for the register game **)
-  val recover_sol : Paritygame.solution -> Paritygame.solution
+  (** Recover the solution for the original game from the 
+      strategy for the register game, the mapping from
+      the cleared up game to the full register game and 
+      the number of nodes in the original game **)
+  val recover_sol : Paritygame.solution -> int array -> int -> Paritygame.solution
 
-  (** Recover a strategy for the original game from the 
-      strategy for the register game **)
-  val recover_str : Paritygame.strategy -> Paritygame.strategy
+  (** Recover the strategy for the original game from the 
+      strategy for the register game, the mapping from
+      the cleared up game to the full register game and 
+      the number of nodes in the original game **)
+  val recover_str : Paritygame.strategy -> int array -> int -> Paritygame.strategy
 end
