@@ -18,6 +18,10 @@ let rec pow a = function
   | n -> 
     let b = pow a (n / 2) in
     b * b * (if n mod 2 = 0 then 1 else a)
+let clog2 x =
+  if x = 0 then 0 else
+  let rec find y p = if y >= x then p else find (y lsl 1) (p + 1) in
+  find 1 0
 
 module Converters = struct
   let s = ref 0
@@ -157,7 +161,8 @@ module RegisterGame = struct
       update_stack succ
     done;
     let cleared_up = Array.make !visited_count (0, Paritygame.plr_undef, [], None) in
-    let mapping = Hashtbl.create !visited_count in
+    let mapping_old_to_new = Hashtbl.create !visited_count in
+    let mapping_new_to_old = Array.make !visited_count 0 in
     visited_count := 0;
     (** Create cleared up array of nodes and a new mapping **)
     log_debug "Creating a cleared up array of nodes and a map for successors";
@@ -168,7 +173,9 @@ module RegisterGame = struct
           if i < Array.length rg_nodes then rg_nodes.(i)
           else reset_nodes.(i - Array.length rg_nodes);
         (** Remember that old idx i is now index !visited_count **)
-        Hashtbl.add mapping i !visited_count;
+        Hashtbl.add mapping_old_to_new i !visited_count;
+        (** Remember that new index !visited_count is the old i **)
+        mapping_new_to_old.(!visited_count) <- i;
         visited_count := !visited_count + 1;
       end
     done;
@@ -178,18 +185,17 @@ module RegisterGame = struct
       let v, o, succ, desc = cleared_up.(i) in
       let rec update_successors = function
         | [] -> []
-        | hd :: tl -> Hashtbl.find mapping hd :: update_successors tl
+        | hd :: tl -> Hashtbl.find mapping_old_to_new hd :: update_successors tl
       in
       cleared_up.(i) <- (v, o, update_successors succ, desc);
     done;
-    cleared_up
+    (cleared_up, mapping_new_to_old)
 
   let create pg =
     let module PG = Paritygame in
     let nodes = PG.collect_nodes pg (fun _ _ -> true) in
     let n = PG.ns_size nodes in
-    let n_float = float_of_int n in
-    k := (log2 n_float) +. 1. |> ceil |> int_of_float;
+    k := clog2 n + 1;
     Converters.k := !k;
     (** TODO: Check if this actually finds the max priority **)
     p := PG.pg_max_prio pg;
@@ -271,24 +277,40 @@ module RegisterGame = struct
       rg_nodes 
     in
     log_debug "Removing unnecessary nodes from the graph";
-    let cleared_up_nodes = remove_unnecessary_nodes pg rg_nodes reset_nodes in
+    let cleared_up_nodes, mapping_new_to_old = remove_unnecessary_nodes pg rg_nodes reset_nodes in
     (** Initialise the game **)
     PG.pg_init (Array.length cleared_up_nodes)
-      (fun node -> cleared_up_nodes.(node))
+      (fun node -> cleared_up_nodes.(node)), mapping_new_to_old
 
-  let recover_sol rg_sol = Paritygame.sol_make 0
+  let recover_sol rg_sol mapping n =
+    log_debug "Recovering solution";
+    let sol = Array.make n Paritygame.plr_undef in
+    Paritygame.sol_iter (fun node plr ->
+        log_debug ("Node: " ^ string_of_int node);
+        let original_rg_node = mapping.(node) in
+        log_debug ("Original rg node: " ^ string_of_int original_rg_node);
+        if original_rg_node < 2 * !s * n then (
+          let original_g_node = idx_to_node original_rg_node in
+          log_debug ("Original g node: " ^ string_of_int original_g_node);
+          if sol.(original_g_node) <> plr && sol.(original_g_node) <> Paritygame.plr_undef 
+          then failwith "Inconsistency in the strategy"
+          else sol.(original_g_node) <- plr
+        )
+      ) rg_sol;
+    sol
 
-  let recover_str rg_str = Paritygame.str_make 0
+  let recover_str rg_str mapping n = Paritygame.str_make n
 end
 
 let underlying_solver : Paritygame.global_solver ref = ref Recursive.solve
 
 let solve game = 
-  let rg = RegisterGame.create game in
+  let n = Paritygame.collect_nodes game (fun _ _ -> true) |> Paritygame.ns_size in
+  let rg, mapping = RegisterGame.create game in
   if !Basics.verbosity >= 2 then Paritygame.print_game rg;
   let rg_sol, rg_str = !underlying_solver rg in
   if !Basics.verbosity >= 2 then Paritygame.print_solution_strategy_parsable rg_sol rg_str;
-  (RegisterGame.recover_sol rg_sol, RegisterGame.recover_str rg_str)
+  (RegisterGame.recover_sol rg_sol mapping n, RegisterGame.recover_str rg_str mapping n)
 
 module CommandLine = struct
   let speclist =  [(["--solver"; "-s"], String (fun i -> 
