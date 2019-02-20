@@ -123,5 +123,5 @@ module RegisterGame : sig
       strategy for the register game, the mapping from
       the cleared up game to the full register game and 
       the number of nodes in the original game **)
-  val recover_str : Paritygame.strategy -> int array -> int -> Paritygame.strategy
+  val recover_str : Paritygame.paritygame -> Paritygame.strategy -> int array -> int -> Paritygame.strategy
 end

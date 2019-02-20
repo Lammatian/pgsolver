@@ -122,9 +122,6 @@ module RegisterGame = struct
     let updated_registers = update_registers registers priority_in_g in
     desc_to_idx neighbour_in_g updated_registers 0
 
-  (** TODO: Some examples created by bin/randomgame aren't
-      necessarily in this form. Check if this is even necessary
-      or can this step be ignored **)
   let remove_unnecessary_nodes pg rg_nodes reset_nodes =
     let visited = Array.make (Array.length rg_nodes + Array.length reset_nodes) false in
     let visited_count = ref 0 in
@@ -220,10 +217,11 @@ module RegisterGame = struct
             otherwise the owner is the owner in the original game **)
         let owner = if j < !s then PG.plr_Even else PG.pg_get_owner pg node in
         (** Priority depends on the owner **)
-        let priority = if owner = PG.plr_Even then 0 else 1 in
+        (* let priority = if owner = PG.plr_Even then 0 else 1 in *)
+        let priority = 1 in
         (** Add description if verbosity >= 2 **)
         let desc = if !Basics.verbosity >= 2 then Some (string_of_desc node (idx_to_regs j) (idx_to_t j)) else None in
-        log_debug ("Desc: " ^ match desc with Some x -> x | None -> "");
+        (*log_debug ("Desc: " ^ match desc with Some x -> x | None -> "");*)
         rg_nodes.(node * 2 * !s + j) <- (priority, owner, [], desc)
       done;)
       nodes;
@@ -241,7 +239,7 @@ module RegisterGame = struct
         let underlying_node = idx_to_node i in
         let successor = desc_to_idx_reset underlying_node registers r in
         let desc = if !Basics.verbosity >= 2 then Some ("r" ^ string_of_int r ^ string_of_desc underlying_node registers 0) else None in
-        log_debug ("Desc: " ^ match desc with Some x -> x | None -> "");
+        (* log_debug ("Desc: " ^ match desc with Some x -> x | None -> ""); *)
         reset_nodes.(i * !k + r - 1) <- (priority, owner, [successor], desc)
       done)
       rg_nodes;
@@ -286,20 +284,51 @@ module RegisterGame = struct
     log_debug "Recovering solution";
     let sol = Array.make n Paritygame.plr_undef in
     Paritygame.sol_iter (fun node plr ->
-        log_debug ("Node: " ^ string_of_int node);
+        (*log_debug ("Node: " ^ string_of_int node);*)
         let original_rg_node = mapping.(node) in
-        log_debug ("Original rg node: " ^ string_of_int original_rg_node);
+        (* log_debug ("Original rg node: " ^ string_of_int original_rg_node); *)
         if original_rg_node < 2 * !s * n then (
           let original_g_node = idx_to_node original_rg_node in
-          log_debug ("Original g node: " ^ string_of_int original_g_node);
+          (* log_debug ("Original g node: " ^ string_of_int original_g_node); *)
           if sol.(original_g_node) <> plr && sol.(original_g_node) <> Paritygame.plr_undef 
-          then failwith "Inconsistency in the strategy"
+          then failwith "Inconsistency in the solution"
           else sol.(original_g_node) <- plr
         )
       ) rg_sol;
     sol
 
-  let recover_str rg_str mapping n = Paritygame.str_make n
+  let recover_str pg rg_str mapping n =
+    log_debug "Recovering strategy";
+    let str = Array.make n Paritygame.nd_undef in
+    Paritygame.str_iter (fun node strat ->
+        (* log_debug ("Node: " ^ string_of_int node);
+        log_debug ("Strat: " ^ string_of_int strat); *)
+        if strat <> Paritygame.nd_undef then (
+          let original_rg_node = mapping.(node) in
+          let original_rg_strat = mapping.(strat) in
+          (* log_debug ("Original rg node: " ^ string_of_int original_rg_node);
+          log_debug ("Original rg strat: " ^ string_of_int original_rg_strat); *)
+          if original_rg_node < 2 * !s * n then (
+            let t = idx_to_t original_rg_node in
+            if t = 1 then (
+              let original_g_node = idx_to_node original_rg_node in
+              let original_g_strat = idx_to_node original_rg_strat in
+              let v, r, t = idx_to_desc original_rg_node in
+              let vs, rs, ts = idx_to_desc original_rg_strat in
+              log_debug ("Original g node: " ^ string_of_int original_g_node ^ "|" ^ string_of_desc v r t);
+              log_debug ("Original g strat: " ^ string_of_int original_g_strat ^ "|" ^ string_of_desc vs rs ts);
+              if str.(original_g_node) <> original_g_strat && str.(original_g_node) <> Paritygame.nd_undef 
+              then (
+                log_debug "Inconsistency in the strategy";
+                if Paritygame.pg_get_owner pg original_g_node = Paritygame.plr_Even then str.(original_g_node) <- original_g_strat
+              )
+              else str.(original_g_node) <- original_g_strat
+              (* if str.(original_g_node) = Paritygame.nd_undef then str.(original_g_node) <- original_g_strat *)
+            )
+          )
+        )
+      ) rg_str;
+    str
 end
 
 let underlying_solver : Paritygame.global_solver ref = ref Recursive.solve
@@ -307,10 +336,10 @@ let underlying_solver : Paritygame.global_solver ref = ref Recursive.solve
 let solve game = 
   let n = Paritygame.collect_nodes game (fun _ _ -> true) |> Paritygame.ns_size in
   let rg, mapping = RegisterGame.create game in
-  if !Basics.verbosity >= 2 then Paritygame.print_game rg;
+  (* if !Basics.verbosity >= 2 then Paritygame.print_game rg; *)
   let rg_sol, rg_str = !underlying_solver rg in
-  if !Basics.verbosity >= 2 then Paritygame.print_solution_strategy_parsable rg_sol rg_str;
-  (RegisterGame.recover_sol rg_sol mapping n, RegisterGame.recover_str rg_str mapping n)
+  (* if !Basics.verbosity >= 2 then Paritygame.print_solution_strategy_parsable rg_sol rg_str; *)
+  (RegisterGame.recover_sol rg_sol mapping n, RegisterGame.recover_str game rg_str mapping n)
 
 module CommandLine = struct
   let speclist =  [(["--solver"; "-s"], String (fun i -> 
