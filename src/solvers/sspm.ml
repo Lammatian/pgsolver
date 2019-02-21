@@ -561,40 +561,57 @@ let invert pg =
       )
     )
 
-let solve_for_odd pg (sol, str) =
-  (* log_debug "Solving the game for player Odd"; *)
-  let module PG = Paritygame in
-  (** Filter out nodes won by Even as they cannot be visited anyway **)
-  let (subgame, map_to_sub, map_to_game) = PG.subgame_by_node_filter pg (fun node -> sol.(node) <> PG.plr_Even) in
-  (** Check if there's anything to solve for Odd **)
-  if PG.pg_size subgame > 0 then
-  begin
-    log_info "Odd has winning nodes, finding strategies";
-    (** Invert the subgame and solve the inverted for Even **)
-    let inverted = invert subgame in
-    log_info "Solving inverted game";
-    let (_, str_inv) = solve' inverted in
-    log_info "Solved inverted game";
-    (** Update the strategies **)
-    PG.str_iter
-      (fun n1 n2 ->
-        (*log_debug (
-          "Updating the strategy for nodes " ^ 
-          PG.nd_show n1 ^ 
-          " and " ^
-          PG.nd_show n2);*)
-        if PG.pg_get_owner inverted n1 = PG.plr_Even
-        then PG.str_set str (map_to_game n1) (map_to_game n2)
-      )
-      str_inv;
-  end;
-  (* log_debug ("Sol size: " ^ (Array.length sol |> string_of_int)); *)
-  (* log_debug ("Str size: " ^ (Array.length str |> string_of_int)); *)
-  (sol, str)
-
 let solve game = 
+  let module PG = Paritygame in
   let open Univsolve in
-  universal_solve (universal_solve_init_options_verbose !universal_solve_global_options) (fun pg -> solve' pg |> solve_for_odd pg) game
+  universal_solve (universal_solve_init_options_verbose !universal_solve_global_options) 
+  (fun pg -> 
+    (** Get node count for each player to determine which game to solve first
+        hoping for a speedup **)
+    let even_nodes_count = PG.collect_nodes_by_prio game (fun p -> p mod 2 = 0) |> PG.ns_size in
+    let odd_nodes_count = PG.collect_nodes_by_prio game (fun p -> p mod 2 = 1) |> PG.ns_size in
+    (** Get solution and strategy for the player that has more nodes in the game **)
+    let (sol, str) =
+      if even_nodes_count > odd_nodes_count then
+        (** Even has more nodes, solve normally for even **)
+        solve' pg
+      else
+        (** Odd has more nodes, invert and then solve **)
+        let (sol_inv, str_inv) = invert pg |> solve' in
+        (** Invert the winning sets to get the ones for the original game **)
+        PG.sol_iter (fun node player ->
+          PG.sol_set sol_inv node (PG.plr_opponent player))
+        sol_inv;
+        (sol_inv, str_inv)
+    in
+    let solved_for = if even_nodes_count > odd_nodes_count then PG.plr_Even else PG.plr_Odd in
+    (** Create a subgame with all the winning nodes for the other player **)
+    let (subgame, map_to_sub, map_to_game) = PG.subgame_by_node_filter pg (fun node -> sol.(node) <> solved_for) in
+    if even_nodes_count > odd_nodes_count then
+      (** Created a subgame for Odd, need to invert it and then solve **)
+      let inverted = invert subgame in
+      let (_, str_sub_inv) = solve' inverted in
+      (** Combine this strategy for Odd with the strategy for Even **)
+      PG.str_iter
+        (fun n1 n2 ->
+          if PG.pg_get_owner inverted n1 = PG.plr_Even
+          then PG.str_set str (map_to_game n1) (map_to_game n2)
+        )
+      str_sub_inv;
+    else
+      (** Created a subgame for Even, no need to invert stuff **)
+      let (_, str_sub) = solve' subgame in
+      (** Combine this strategy for Even with the strategy for Odd **)
+      PG.str_iter
+        (fun n1 n2 ->
+          if PG.pg_get_owner subgame n1 = PG.plr_Even
+          then PG.str_set str (map_to_game n1) (map_to_game n2)
+        )
+      str_sub;
+    ;
+    (sol, str)
+  ) 
+  game
 
 let register () =
   Solverregistry.register_solver
