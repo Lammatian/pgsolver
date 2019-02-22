@@ -14,7 +14,6 @@ let clog2 x =
   find 1 0
 
 let binary_length x = clog2 (x + 1)
-(** TODO: You are only using pow 2 so use lsl **)
 let rec pow a = function
   | 0 -> 1
   | 1 -> a
@@ -25,6 +24,8 @@ let pow2 n = 1 lsl n
 
 module BString = struct
   type t = BString of int * int | Empty
+
+  let set_mu m = ()
 
   let create x y =
     if y = 0 then Empty else BString (x, y)
@@ -109,86 +110,70 @@ module BString = struct
 end
 
 module BString2 = struct
-  type t = BString of bool list | Empty
+  type t = int * int
 
-  let create = function
-    | [] -> Empty
-    | list -> BString list
+  (** Maximum length in bits **)
+  let mlen = ref 0
 
-  let create_len = function
-    | 0 -> Empty
-    | l -> BString (List.init l (fun _ -> false))
+  let set_mu m = mlen := m
 
-  let show = function
-    | Empty -> "ε"
-    | BString list ->
-      let rec loop = function
-        | [] -> ""
-        | hd :: tl -> (if hd then "1" else "0") ^ loop tl
-      in
-      loop list
-
-  let print bstr = print_string (show bstr)
-
-  let length = function
-    | Empty -> 0
-    | BString list -> List.length list
-
-  let extend bstr n =
-    if length bstr < n then
-      match bstr with
-      | Empty ->
-        let 
-          list = List.init n (fun i -> i = 0)
-        in
-        BString list
-      | BString list ->
-        let to_add = n - length bstr in
-        let zeros = List.init to_add (fun i -> i = 0) in
-        BString (List.append list zeros)
-    else
-      bstr
+  let create x y = (x, y)
   
-  let cut bstr =
-    match bstr with
-    | Empty -> Empty
-    | BString list ->
-      (** Cut zeros from start in reversed **)
-      let rec cut_zero = function
-        | [] -> []
-        | hd :: tl ->
-          if hd then cut_zero tl else tl
+  let create_len l = (pow2 (!mlen - l), l)
+
+  let is_empty (b, l) = b = (pow2 !mlen)
+
+  (** Max <=> all ones, not really a good name **)
+  let is_max (b, l) = 
+    let rec is_max_rec b l s p =
+      if l = 0 then false
+      else if b = s - p then true
+      else is_max_rec b (l-1) s (2*p)
+    in
+    is_max_rec b !mlen (pow2 (!mlen + 1)) 1
+
+  let show (b, l) =
+    if is_empty (b, l) then "ε" 
+    else 
+      let rec show_rec n m l s =
+        if l = 0 then s
+        else if n = m then s
+        else if n > m then show_rec (n mod m) (m/2) (l-1) (s ^ "1")
+        else show_rec (n mod m) (m/2) (l-1) (s ^ "0")
       in
-      let list_cut = List.rev list |> cut_zero |> List.rev in
-      if List.length list_cut = 0 then Empty
-      else BString list_cut
+      show_rec b (pow2 !mlen) l ""
 
-  let is_max = function
-    | Empty -> false
-    | BString list ->
-      List.for_all (fun x -> x) list
+  let print (b, l) = show (b, l) |> print_string
 
-  let is_empty = function
-    | Empty -> true
-    | BString _ -> false
+  let length (b, l) = l
 
-  let compare bstr1 bstr2 =
-    match bstr1, bstr2 with
-    | Empty, Empty           -> 0
-    | BString list, Empty    -> if List.hd list then 1 else -1
-    | Empty, BString list    -> if List.hd list then -1 else 1
-    | BString l1, BString l2 ->
-      let rec compare_rec l1 l2 =
-        match l1, l2 with
-        | [], []             -> 0
-        | hd :: tl, []       -> if hd then  1 else -1
-        | [], hd :: tl       -> if hd then  -1 else 1
-        | h1 :: t1, h2 :: t2 ->
-          if h1 && not h2 then 1
-          else if not h1 && h2 then -1
-          else compare_rec t1 t2
-      in
-      compare_rec l1 l2
+  let extend (b, l) n =
+    if l < n then
+      (b + pow2 (!mlen - n), n)
+    else
+      (b, l)
+
+  let cut (b, l) =
+    let rec get_length n m len = 
+      if n mod m = m/2 then len
+      else get_length n (2*m) (len - 1)
+    in
+    let rec get_value n p b =
+      if n mod 2 = 1 then b + p
+      else get_value (n/2) (2*p) b
+    in
+    let value = get_value b 1 b in
+    let length = get_length value 2 !mlen in
+    if value >= pow2 (!mlen + 1) then
+      (** Empty **)
+      (pow2 !mlen, 0)
+    else
+      (value, length)
+
+  let compare (b1, l1) (b2, l2) =
+    if b1 > b2 then 1
+    else if b1 = b2 then 0
+    else -1
 end
 
 module AdaptiveCounter = struct
@@ -304,9 +289,8 @@ module AdaptiveCounter = struct
       let i = ref (Array.length arr - 1) in
       let ret = ref false in
       while not !ret && !i >= 0 do
-        match arr.(!i) with
-        | Empty -> i := !i - 1
-        | BString _ -> ret := true
+        if BString.is_empty arr.(!i) then i := !i - 1
+        else ret := true
       done;
       ACounter (Array.sub arr 0 (!i + 1))
 
@@ -355,6 +339,7 @@ module ProgressMeasure = struct
     AdaptiveCounter.set_d !d;
     mu := Paritygame.ns_fold (fun acc node -> acc + (Paritygame.pg_get_priority pg node) mod 2) 0 nodes;
     clog_mu := clog2 !mu;
+    BString.set_mu !clog_mu;
     (* log_debug ("Value of μ: " ^ string_of_int !mu); *)
     let ht = Array.make (Paritygame.ns_size nodes) AdaptiveCounter.empty in
     (* log_debug ("Size of the hashtable: " ^ (string_of_int (Hashtbl.length ht))); *)
@@ -516,8 +501,8 @@ let solve' (pg : Paritygame.paritygame) : (Paritygame.solution * Paritygame.stra
   let nonprog = ref (PG.ns_filter (fun node -> PG.pg_get_priority pg node mod 2 = 1) nodes) in
   (** Call lift on non-progressive until all progressive **)
   while not (PG.ns_isEmpty !nonprog) do
-    (* log_debug ("### New loop: " ^ string_of_int (PG.ns_size !nonprog) ^ " non-progressive"); *)
-    (* log_debug (ProgressMeasure.show pm); *)
+    (* log_debug ("### New loop: " ^ string_of_int (PG.ns_size !nonprog) ^ " non-progressive");
+    log_debug (ProgressMeasure.show pm); *)
     let non_prog_node = PG.ns_some !nonprog in
     (** TODO: This may be slow **)
     nonprog := PG.ns_del non_prog_node !nonprog;
