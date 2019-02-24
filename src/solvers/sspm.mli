@@ -7,6 +7,7 @@ module BString : sig
   type t
   (** Create BString from a list of booleans **)
   val create     : int -> int -> t
+  (* val create     : bool list -> t *)
 
   (** Create BString of all 0s of length of the first argument **)
   val create_len : int -> t
