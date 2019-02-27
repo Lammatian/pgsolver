@@ -6,8 +6,7 @@ val register: unit -> unit
 module BString : sig
   type t
   (** Create BString from a list of booleans **)
-  val create     : int -> int -> t
-  (* val create     : bool list -> t *)
+  val create     : bool list -> t
 
   (** Create BString of all 0s of length of the first argument **)
   val create_len : int -> t
@@ -123,7 +122,7 @@ module ProgressMeasure : sig
   val mu : int ref
 
   (** ceil(log2(mu)) **)
-  val clog_mu : int ref
+  val max_len : int ref
 
   (** Size of the ProgressMeasure i.e. the number of nodes **)
   val size : t -> int

@@ -2,104 +2,20 @@ open Basics;;
 open Paritygame;;
 open Tcsqueue;;
 
-let log_debug msg = message_autotagged 3 (fun _ -> "SSPM") (fun _ -> msg ^ "\n") ;;
-let log_verb msg = message_autotagged 2 (fun _ -> "SSPM") (fun _ -> msg ^ "\n") ;;
-let log_info msg = message_autotagged 2 (fun _ -> "SSPM") (fun _ -> msg ^ "\n") ;;
+let log_debug = message 3
+let log_verb  = message 2
+let log_info  = message 2
+
+let log_debug_tagged = message_autotagged 3 (fun _ -> "SSPM")
+let log_verb_tagged  = message_autotagged 2 (fun _ -> "SSPM")
+let log_info_tagged  = message_autotagged 2 (fun _ -> "SSPM")
 
 let clog2 x =
   if x = 0 then 0 else
   let rec find y p = if y >= x then p else find (y lsl 1) (p + 1) in
   find 1 0
 
-let binary_length x = clog2 (x + 1)
-let pow2 n = 1 lsl n
-
 module BString = struct
-  type t = BString of int * int | Empty
-
-  let create x y =
-    if y = 0 then Empty else BString (x, y)
-
-  let create_len y = create 0 y
-
-  let show = function
-    | Empty -> "ε"
-    | BString (x, y) ->
-      let leading_zeros = String.make (y - binary_length x) '0' in
-      let rec convert x s =
-        if x > 0 then convert (x / 2) s ^ (x mod 2 |> string_of_int) else ""
-      in
-      leading_zeros ^ convert x ""
-
-  let print bstr = show bstr |> print_string
-
-  let length = function
-    | Empty -> 0
-    | BString (x, y) -> y
-
-  let extend bstr n =
-    if length bstr < n then
-      match bstr with
-        | Empty -> BString (pow2 (n - 1), n)
-        | BString (x, y) ->
-          BString (x lsl (n - y) + pow2 (n - y - 1), n)
-    else
-      bstr
-  
-  let cut = function
-    | Empty -> Empty
-    | BString (x, y) ->
-      let rec cut_ones x y =
-        if y = 0 then Empty
-        else if x mod 2 = 1 then cut_ones (x asr 1) (y - 1) 
-        else if y = 1 then Empty
-        else BString (x asr 1, y - 1)
-      in
-      cut_ones x y
-
-  let is_max = function
-    | Empty -> false
-    | BString (x, y) ->
-      let rec loop x y =
-        if x mod 2 = 0 then false
-        else if x = 1 then y = 1
-        else loop (x asr 1) (y - 1)
-      in
-      loop x y
-  
-  let is_empty = function
-    | Empty -> true
-    | BString _ -> false
-
-  let compare b1 b2 =
-    (* log_debug ("Comparing " ^ show b1 ^ " and " ^ show b2); *)
-    match b1, b2 with
-    | Empty, Empty          -> 0
-    | Empty, BString (x, y) -> if binary_length x = y then -1 else 1
-    | BString (x, y), Empty -> if binary_length x = y then 1 else -1
-    | BString (x1, y1), BString (x2, y2) ->
-      let zeros1 = y1 - binary_length x1 in
-      let zeros2 = y2 - binary_length x2 in
-      if zeros1 < zeros2 then 1
-      else if zeros1 > zeros2 then -1
-      else if x1 = x2 then 0
-      else
-      begin
-        let cut_len = min (binary_length x1) (binary_length x2) in
-        let cut_x1 = x1 asr (binary_length x1 - cut_len) in
-        let cut_x2 = x2 asr (binary_length x2 - cut_len) in
-        if cut_x1 > cut_x2 then 1
-        else if cut_x1 < cut_x2 then -1
-        else if cut_x1 = x1 then
-          let check = pow2 (binary_length x2 - cut_len - 1) in
-          if x2 land check <> 0 then -1 else 1
-        else
-          let check = pow2 (binary_length x1 - cut_len - 1) in
-          if x1 land check <> 0 then 1 else -1
-      end
-end
-
-module BString2 = struct
   type t = BString of bool list | Empty
 
   let create = function
@@ -242,7 +158,6 @@ module AdaptiveCounter = struct
     let ret = ref 0 in
     while !ret = 0 && !i < length ac1 && !i < length ac2 do
       ret := BString.compare arr1.(!i) arr2.(!i);
-      (* log_debug ("Returned " ^ string_of_int !ret); *)
       i := !i + 1
     done;
     if !ret = 0 && length ac1 < length ac2 then -1
@@ -321,7 +236,7 @@ module ProgressMeasure = struct
 
   let mu = ref 0
 
-  let clog_mu = ref 0
+  let max_len = ref 0
 
   let size = Array.length
 
@@ -331,20 +246,19 @@ module ProgressMeasure = struct
     !str
 
   let create pg nodes = 
-    (* log_debug "Creating ProgressMeasure"; *)
+    log_debug (fun _ -> "Creating ProgressMeasure" ^ "\n");
     let maxPriority = Paritygame.ns_fold 
       (fun acc node -> max acc (Paritygame.pg_get_priority pg node)) 0 nodes
     in
-    (* log_debug ("Highest priority found: " ^ string_of_int maxPriority); *)
+    log_debug (fun _ -> "Highest priority found: " ^ string_of_int maxPriority ^ "\n");
     d := if maxPriority mod 2 = 0 then maxPriority else maxPriority + 1;
-    (* log_debug ("Value of d: " ^ string_of_int !d); *)
+    log_debug (fun _ -> "Value of d: " ^ string_of_int !d ^ "\n");
     (** Set d in the AdaptiveCounter as well **)
     AdaptiveCounter.set_d !d;
     mu := Paritygame.ns_fold (fun acc node -> acc + (Paritygame.pg_get_priority pg node) mod 2) 0 nodes;
-    clog_mu := clog2 !mu;
-    (* log_debug ("Value of μ: " ^ string_of_int !mu); *)
+    max_len := clog2 !mu;
+    log_debug (fun _ -> "Value of μ: " ^ string_of_int !mu ^ "\n");
     let ht = Array.make (Paritygame.ns_size nodes) AdaptiveCounter.empty in
-    (* log_debug ("Size of the hashtable: " ^ (string_of_int (Hashtbl.length ht))); *)
     ht
 
   let get_AC pm node = pm.(node)
@@ -370,84 +284,64 @@ module ProgressMeasure = struct
 
   let lift_ pm pg node neighbour =
     (** Page 14-15 of the paper **)
-    (* log_debug ("Calling lift_ on the edge (" ^ nd_show node ^ "," ^ nd_show neighbour ^ ")"); *)
     let module AC = AdaptiveCounter in
     let module BS = BString in
     let neighbourAC = get_AC pm neighbour in
-    (* log_debug ("Neighbour's AC: " ^ AC.show neighbourAC); *)
     if AC.is_max neighbourAC then
       AC.Top
     else
     let k = AC.last_index neighbourAC in
     let p = Paritygame.pg_get_priority pg node in
     let trimmedNAC = AC.trim neighbourAC p in
-    (* log_debug ("Neighbour's trimmed AC: " ^ AC.show trimmedNAC); *)
     if p mod 2 = 0 then
-    begin
-      let ret = AC.max trimmedNAC (get_AC pm node) in
-      (* log_debug ("Even priority, returning max: " ^ AC.show ret); *)
-      ret
-    end
-    else if k > p then (** Append 0s to the total max length **)
-    begin      
-      (* log_debug "k is greater than priority, appending zeros"; *)
-      let toAppend = !clog_mu - AC.length_BStr neighbourAC in
+      AC.max trimmedNAC (get_AC pm node)
+    else if k > p then (
+      (** Append 0s to the total max length **)
+      let toAppend = !max_len - AC.length_BStr neighbourAC in
       let appendedBS = BS.create_len toAppend in
       AC.append neighbourAC appendedBS
-    end
-    else if AC.length_BStr trimmedNAC < !clog_mu then
-    begin
-      (* log_debug "AdaptiveCounter not fully filled in, filling in"; *)
+    )
+    else if AC.length_BStr trimmedNAC < !max_len then (
       let last_elt = AC.get_last trimmedNAC in
-      let extension_len = !clog_mu - (AC.length_BStr trimmedNAC - BS.length last_elt) in
+      let extension_len = !max_len - (AC.length_BStr trimmedNAC - BS.length last_elt) in
       let extended_last = BS.extend last_elt extension_len in
-      (* log_debug ("Extended last: " ^ BS.show extended_last); *)
       AC.set_last trimmedNAC extended_last;
-      (* log_debug ("lift_ returned " ^ AC.show trimmedNAC); *)
       trimmedNAC
-    end
+    )
     else
     let trimmed_to_nonempty = AC.trim_to_last_nonempty trimmedNAC in
-    (* log_debug ("Trimmed to non-empty: " ^ AC.show trimmed_to_nonempty); *)
     (** If the resulting AdaptiveCounter at this step is empty
         then the next biggest must be Top:
-        if this is empty then clog_mu must be 0 i.e. we encountered
+        if this is empty then max_len must be 0 i.e. we encountered
         an AdaptiveCounter of only ε's and since k <= p, it was
         maximal. Thus the next smallest thing is Top **)
-    if AC.is_empty trimmed_to_nonempty then
-    begin
-      (* log_debug "Trimmed to non-empty is empty, next smallest is Top"; *)
+    if AC.is_empty trimmed_to_nonempty then (
       AC.Top
-    end 
+    )
     else
     let last_in_trimmed = AC.get_last trimmed_to_nonempty in
-    (* log_debug ("Last in trimmed: " ^ BS.show last_in_trimmed); *)
-    if not (BS.is_max last_in_trimmed) then
+    if not (BS.is_max last_in_trimmed) then (
       let cut_last = BS.cut last_in_trimmed in
-      (* log_debug ("BString after cut: " ^ BS.show cut_last); *)
       AC.set_last trimmed_to_nonempty cut_last;
       trimmed_to_nonempty
-    else if AC.length trimmed_to_nonempty > 1 then
-    (** TODO: This had a bug e.g. in (e, 11) case where it wanted
-              to trim more when we just want to remove last **)
-    begin
+    )
+    else if AC.length trimmed_to_nonempty > 1 then (
       (** Remove last and set the second to last appropriately **)
       let removed_last = AC.remove_last trimmed_to_nonempty in
       let last_in_shortened = AC.get_last removed_last in
       (** TODO: This is complicated lol make it easier to read **)
-      let extension_len = !clog_mu - (AC.length_BStr removed_last - BS.length last_in_shortened) in
+      let extension_len = !max_len - (AC.length_BStr removed_last - BS.length last_in_shortened) in
       let extended_last = BS.extend last_in_shortened extension_len in
       AC.set_last removed_last extended_last;
-      (* log_debug ("lift_ returned " ^ AC.show removed_last); *)
       removed_last
-    end
+    )
     else
       AC.Top
 
   let lift pm pg node =
     let module AC = AdaptiveCounter in
     let module PG = Paritygame in
-    (* log_debug ("Calling lift on node " ^ nd_show node); *)
+    log_debug (fun _ -> "Calling lift on node " ^ nd_show node ^ "\n");
     let neighbours = PG.pg_get_successors pg node |> PG.ns_nodes in
     let newAC = 
     if PG.pg_get_owner pg node = PG.plr_Even then (** Minimum **)
@@ -455,14 +349,15 @@ module ProgressMeasure = struct
     else (** Maximum **)
       List.fold_left (fun acc x -> AC.max acc (lift_ pm pg node x)) AC.empty neighbours
     in
-    (* log_debug ("New AC for that node is " ^ AC.show newAC); *)
+    log_debug (fun _ -> "New AC for that node is " ^ AC.show newAC ^ "\n");
     pm.(node) <- newAC
 
   let get_winning_set pm pg = 
+    log_debug (fun _ -> "Getting the winning sets" ^ "\n");
     Paritygame.sol_init pg 
       (fun node ->
         let node_AC = get_AC pm node in
-        (* log_debug ("Considering node " ^ nd_show node ^ " with AC " ^ AdaptiveCounter.show node_AC); *)
+        log_debug (fun _ -> "Considering node " ^ nd_show node ^ " with AC " ^ AdaptiveCounter.show node_AC ^ "\n");
         match node_AC with
         | AdaptiveCounter.Top -> Paritygame.plr_Odd
         | AdaptiveCounter.ACounter _ -> Paritygame.plr_Even)
@@ -482,18 +377,6 @@ module ProgressMeasure = struct
 end
 
 let solve' (pg : Paritygame.paritygame) : (Paritygame.solution * Paritygame.strategy) =
-  (*Paritygame.pg_iterate (fun node _ ->
-    log_debug (
-      "Node " ^ 
-      Paritygame.nd_show node ^ 
-      " with priority " ^
-      (Paritygame.pg_get_priority pg node |> string_of_int) ^
-      " belonging to player " ^
-      (if Paritygame.pg_get_owner pg node = Paritygame.plr_Even then "Even" else "Odd") ^
-      " with successors [" ^ 
-      List.fold_left (fun acc x -> acc ^ "," ^ Paritygame.nd_show x) "" (Paritygame.pg_get_successors pg node |> Paritygame.ns_nodes) ^
-      "]"))
-    pg;*)
   let module PG = Paritygame in
   let module PM = ProgressMeasure in
   (** Initialise the progress measure **)
@@ -503,15 +386,14 @@ let solve' (pg : Paritygame.paritygame) : (Paritygame.solution * Paritygame.stra
   let nonprog = ref (PG.ns_filter (fun node -> PG.pg_get_priority pg node mod 2 = 1) nodes) in
   (** Call lift on non-progressive until all progressive **)
   while not (PG.ns_isEmpty !nonprog) do
-    (* log_debug ("### New loop: " ^ string_of_int (PG.ns_size !nonprog) ^ " non-progressive");
-    log_debug (ProgressMeasure.show pm); *)
+    log_debug (fun _ -> "### New loop: " ^ string_of_int (PG.ns_size !nonprog) ^ " non-progressive ###" ^ "\n");
+    log_debug (fun _ -> ProgressMeasure.show pm);
     let non_prog_node = PG.ns_some !nonprog in
-    (** TODO: This may be slow **)
     nonprog := PG.ns_del non_prog_node !nonprog;
-    (* log_debug ("Picked non-progressive node " ^ nd_show non_prog_node); *)
+    log_debug (fun _ -> "Picked non-progressive node " ^ nd_show non_prog_node ^ "\n");
     PM.lift pm pg non_prog_node;
     (** Add predecessors that became non-progressive to the list **)
-    (* log_debug "Checking if predecessors became non-progressive"; *)
+    log_debug (fun _ -> "Checking if predecessors became non-progressive" ^ "\n");
     let pred = PG.pg_get_predecessors pg non_prog_node in
     PG.ns_iter (fun node ->
       if PG.pg_get_owner pg node = PG.plr_Odd then
@@ -525,7 +407,7 @@ let solve' (pg : Paritygame.paritygame) : (Paritygame.solution * Paritygame.stra
         then nonprog := PG.ns_add node !nonprog
       end) pred;
   done;
-  log_info "All nodes progressive, finishing up";
+  log_debug (fun _ -> "All nodes progressive, finishing up" ^ "\n");
   let sol = PM.get_winning_set pm pg in
   let str = PM.get_winning_strategy pm pg nodes in
   sol, str
@@ -533,7 +415,7 @@ let solve' (pg : Paritygame.paritygame) : (Paritygame.solution * Paritygame.stra
 let invert pg =
   (** Invert the game by adding one to each priority
       and changing the ownership of nodes **)
-  (* log_debug "Inverting the game"; *)
+  log_debug (fun _ -> "Inverting the game" ^ "\n");
   Paritygame.pg_init
     (Paritygame.pg_size pg)
     (fun node ->
@@ -559,22 +441,28 @@ let solve game =
     let odd_nodes_count = PG.collect_nodes_by_prio game (fun p -> p mod 2 = 1) |> PG.ns_size in
     (** Get solution and strategy for the player that has more nodes in the game **)
     let (sol, str) =
-      if even_nodes_count > odd_nodes_count then
+      if even_nodes_count > odd_nodes_count then (
         (** Even has more nodes, solve normally for even **)
+        log_info_tagged (fun _ -> "Solving the game for Even" ^ "\n");
         solve' pg
-      else
+      )
+      else (
         (** Odd has more nodes, invert and then solve **)
+        log_info_tagged (fun _ -> "Inverting and solving the game for Odd" ^ "\n");
         let (sol_inv, str_inv) = invert pg |> solve' in
         (** Invert the winning sets to get the ones for the original game **)
         PG.sol_iter (fun node player ->
           PG.sol_set sol_inv node (PG.plr_opponent player))
         sol_inv;
         (sol_inv, str_inv)
+      )
     in
+    log_info_tagged (fun _ -> "Solved the game for the first player" ^ "\n");
     let solved_for = if even_nodes_count > odd_nodes_count then PG.plr_Even else PG.plr_Odd in
     (** Create a subgame with all the winning nodes for the other player **)
     let (subgame, map_to_sub, map_to_game) = PG.subgame_by_node_filter pg (fun node -> sol.(node) <> solved_for) in
-    if even_nodes_count > odd_nodes_count then
+    if even_nodes_count > odd_nodes_count then (
+      log_info_tagged (fun _ -> "Solving the subgame for Odd" ^ "\n");
       (** Created a subgame for Odd, need to invert it and then solve **)
       let inverted = invert subgame in
       let (_, str_sub_inv) = solve' inverted in
@@ -585,7 +473,9 @@ let solve game =
           then PG.str_set str (map_to_game n1) (map_to_game n2)
         )
       str_sub_inv;
-    else
+    )
+    else (
+      log_info_tagged (fun _ -> "Solving the subgame for Even" ^ "\n");
       (** Created a subgame for Even, no need to invert stuff **)
       let (_, str_sub) = solve' subgame in
       (** Combine this strategy for Even with the strategy for Odd **)
@@ -595,7 +485,8 @@ let solve game =
           then PG.str_set str (map_to_game n1) (map_to_game n2)
         )
       str_sub;
-    ;
+    );
+    log_info_tagged (fun _ -> "Solved the subgame, finishing up" ^ "\n");
     (sol, str)
   ) 
   game
@@ -605,4 +496,4 @@ let register () =
     solve
     "succsmallpm"
     "progm"
-    "Quasi-polynomial time algorithm by Jurdzinski and Lazic (2017)"
+    "Quasi-polynomial time and quasi-linear space algorithm by Jurdzinski and Lazic (2017)"
