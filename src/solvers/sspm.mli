@@ -119,9 +119,9 @@ module ProgressMeasure : sig
   val d : int ref
 
   (** Number of nodes with odd priority **)
-  val mu : int ref
+  val eta : int ref
 
-  (** ceil(log2(mu)) **)
+  (** ceil(log2(eta)) **)
   val max_len : int ref
 
   (** Size of the ProgressMeasure i.e. the number of nodes **)
@@ -132,10 +132,13 @@ module ProgressMeasure : sig
 
   (** Create ProgressMeasure mapping all nodes to the
       lowest possible AdaptiveCounter **)
-  val create               : Paritygame.paritygame -> Paritygame.nodeset -> t
+  val create : Paritygame.paritygame -> Paritygame.nodeset -> t
 
   (** Get AdaptiveCounter for the given node **)
-  val get_AC               : t -> Paritygame.node -> AdaptiveCounter.t
+  val get_AC : t -> Paritygame.node -> AdaptiveCounter.t
+  
+  (** Set AdaptiveCounter for the given node **)
+  val set_AC : t -> Paritygame.node -> AdaptiveCounter.t -> unit
 
   (** Check if a given edge is progressive. Returns
       an error if edge doesn't exist **)

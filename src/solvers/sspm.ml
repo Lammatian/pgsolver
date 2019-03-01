@@ -154,15 +154,15 @@ module AdaptiveCounter = struct
     | Top, ACounter arr -> 1
     | ACounter arr, Top -> -1
     | (ACounter arr1 as ac1), (ACounter arr2 as ac2) ->
-    let i = ref 0 in
-    let ret = ref 0 in
-    while !ret = 0 && !i < length ac1 && !i < length ac2 do
-      ret := BString.compare arr1.(!i) arr2.(!i);
-      i := !i + 1
-    done;
-    if !ret = 0 && length ac1 < length ac2 then -1
-    else if !ret = 0 && length ac1 > length ac2 then 1
-    else !ret
+      let i = ref 0 in
+      let ret = ref 0 in
+      while !ret = 0 && !i < length ac1 && !i < length ac2 do
+        ret := BString.compare arr1.(!i) arr2.(!i);
+        i := !i + 1
+      done;
+      if !ret = 0 && length ac1 < length ac2 then -1
+      else if !ret = 0 && length ac1 > length ac2 then 1
+      else !ret
 
   let trim_compare ac1 ac2 pi =
     match ac1, ac2 with
@@ -234,7 +234,7 @@ module ProgressMeasure = struct
 
   let d = ref 0
 
-  let mu = ref 0
+  let eta = ref 0
 
   let max_len = ref 0
 
@@ -255,13 +255,15 @@ module ProgressMeasure = struct
     log_debug (fun _ -> "Value of d: " ^ string_of_int !d ^ "\n");
     (** Set d in the AdaptiveCounter as well **)
     AdaptiveCounter.set_d !d;
-    mu := Paritygame.ns_fold (fun acc node -> acc + (Paritygame.pg_get_priority pg node) mod 2) 0 nodes;
-    max_len := clog2 !mu;
-    log_debug (fun _ -> "Value of μ: " ^ string_of_int !mu ^ "\n");
+    eta := Paritygame.ns_fold (fun acc node -> acc + (Paritygame.pg_get_priority pg node) mod 2) 0 nodes;
+    max_len := clog2 !eta;
+    log_debug (fun _ -> "Value of eta: " ^ string_of_int !eta ^ "\n");
     let ht = Array.make (Paritygame.ns_size nodes) AdaptiveCounter.empty in
     ht
 
   let get_AC pm node = pm.(node)
+
+  let set_AC pm node ac = pm.(node) <- ac
 
   let is_edge_progressive pm pg n1 n2 =
     let module AC = AdaptiveCounter in
@@ -276,10 +278,10 @@ module ProgressMeasure = struct
     let owner = Paritygame.pg_get_owner pg node in
     let successors = Paritygame.pg_get_successors pg node in
     if owner = Paritygame.plr_Even then
-      (** Exists **)
+      (** Even -> exists a progressive edge **)
       Paritygame.ns_exists (fun succ -> is_edge_progressive pm pg node succ) successors
     else
-      (** For all **)
+      (** Odd -> all edges progressive **)
       Paritygame.ns_forall (fun succ -> is_edge_progressive pm pg node succ) successors
 
   let lift_ pm pg node neighbour =
@@ -350,7 +352,7 @@ module ProgressMeasure = struct
       List.fold_left (fun acc x -> AC.max acc (lift_ pm pg node x)) AC.empty neighbours
     in
     log_debug (fun _ -> "New AC for that node is " ^ AC.show newAC ^ "\n");
-    pm.(node) <- newAC
+    set_AC pm node newAC
 
   let get_winning_set pm pg = 
     log_debug (fun _ -> "Getting the winning sets" ^ "\n");
