@@ -331,7 +331,6 @@ module ProgressMeasure = struct
       (** Remove last and set the second to last appropriately **)
       let removed_last = AC.remove_last trimmed_to_nonempty in
       let last_in_shortened = AC.get_last removed_last in
-      (** TODO: This is complicated lol make it easier to read **)
       let extension_len = !max_len - (AC.length_BStr removed_last - BS.length last_in_shortened) in
       let extended_last = BS.extend last_in_shortened extension_len in
       AC.set_last removed_last extended_last;
@@ -496,6 +495,6 @@ let solve game =
 let register () =
   Solverregistry.register_solver
     solve
-    "succsmallpm"
-    "progm"
+    "succinctpm"
+    "spm"
     "Quasi-polynomial time and quasi-linear space algorithm by Jurdzinski and Lazic (2017)"

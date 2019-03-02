@@ -1,5 +1,3 @@
-(** TODO: Consistency in underscore_naming you [REDACTED] **)
-
 val solve : Paritygame.paritygame -> Paritygame.solution * Paritygame.strategy
 val register: unit -> unit
 
