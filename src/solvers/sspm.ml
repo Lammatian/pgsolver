@@ -377,7 +377,7 @@ module ProgressMeasure = struct
     str
 end
 
-let solve' (pg : Paritygame.paritygame) : (Paritygame.solution * Paritygame.strategy) =
+let solve' pg =
   let module PG = Paritygame in
   let module PM = ProgressMeasure in
   (** Initialise the progress measure **)
