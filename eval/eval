@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+
+import subprocess
+import sys
+
+gametypes = ["random", "sparse", "steady"]
+solvers = ["spm", "sp", "re", "si"]
+sizes = [10, 50]
+
+stats = {}
+
+for solver in solvers:
+    stats[solver] = {}
+
+    for size in sizes:
+        print(solver, size)
+        stats[solver][size] = {
+            "solved": {},
+            "timeout": {},
+            "time": {}
+        }
+
+        for gametype in gametypes:
+            stats[solver][size]["solved"][gametype] = 0
+            stats[solver][size]["timeout"][gametype] = 0
+            stats[solver][size]["time"][gametype] = 0.0
+
+for solver in solvers:
+    for size in sizes:
+        time = 0.0
+        games_count = 10
+
+        for gametype in gametypes:
+            for i in range(1, games_count+1):
+                try:
+                    gamename = gametype + "_" + str(size) + "_" + str(i) + ".gm"
+                    cmd = ["../bin/benchmark", "-gp", "-" + solver, "''", gamename]
+                    out = subprocess.check_output(cmd, timeout=3).decode("utf-8")
+                    time += float(out.split()[-2])
+                    stats[solver][size]["solved"][gametype] += 1
+                except subprocess.TimeoutExpired:
+                    stats[solver][size]["timeout"][gametype] += 1
+                except subprocess.CalledProcessError as exc:
+                    print("Something went wrong, rc: ", exc.returncode, "output: ", exc.output)
+                    exit(1)
+            stats[solver][size]["time"][gametype] = time/games_count
+
+for solver in solvers:
+    for size in sizes:
+        for gametype in gametypes:
+            print(solver, size, gametype, stats[solver][size]["solved"][gametype], stats[solver][size]["timeout"][gametype], stats[solver][size]["time"][gametype])
