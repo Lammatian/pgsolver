@@ -7,81 +7,92 @@ gametypes = ["random", "sparse", "steady"]
 solvers = ["spm", "sp", "re", "si"]
 
 def print_usage():
-    print("Usage: eval [number] [size]")
+    print("Usage: eval [solver] [number] [size] [timeout] [folder]")
 
 def parse_args():
-    if len(sys.argv) < 3:
+    if len(sys.argv) < 6:
+        print_usage()
+        exit(1)
+
+    solver = sys.argv[1]
+
+    if not solver in solvers:
+        print("Unrecognised solver")
+        print_usage()
         exit(1)
 
     try:
-        games_count = int(sys.argv[1])
+        games_count = int(sys.argv[2])
     except:
         print_usage()
         exit(1)
 
     try:
-        size = int(sys.argv[2])
+        size = int(sys.argv[3])
     except:
         print_usage()
         exit(1)
 
-    return (games_count, size)
+    try:
+        timeout = int(sys.argv[4])
+    except:
+        print_usage()
+        exit(1)
 
-def evaluate(games_count, size):
+    folder = sys.argv[5]
+
+    return (solver, games_count, size, timeout, folder)
+
+def evaluate(solver, games_count, size, timeout, folder):
     stats = {}
+    stats = {
+        "solved": {},
+        "timeout": {},
+        "time": {}
+    }
 
-    for solver in solvers:
-        stats[solver] = {}
+    for gametype in gametypes:
+        stats["solved"][gametype] = 0
+        stats["timeout"][gametype] = 0
+        stats["time"][gametype] = 0.0
 
-        stats[solver] = {
-            "solved": {},
-            "timeout": {},
-            "time": {}
-        }
+    time = 0.0
 
-        for gametype in gametypes:
-            stats[solver]["solved"][gametype] = 0
-            stats[solver]["timeout"][gametype] = 0
-            stats[solver]["time"][gametype] = 0.0
-
-    for solver in solvers:
-        time = 0.0
-
-        for gametype in gametypes:
-            for i in range(1, games_count+1):
-                try:
-                    gamename = gametype + "_" + str(size) + "_" + str(i) + ".gm"
-                    cmd = ["../bin/benchmark", "-gp", "-" + solver, "''", gamename]
-                    out = subprocess.check_output(cmd, timeout=3).decode("utf-8")
-                    time += float(out.split()[-2])
-                    stats[solver]["solved"][gametype] += 1
-                except subprocess.TimeoutExpired:
-                    stats[solver]["timeout"][gametype] += 1
-                except subprocess.CalledProcessError as exc:
-                    print("Something went wrong, rc: ", exc.returncode, "output: ", exc.output)
-                    exit(1)
-            stats[solver]["time"][gametype] = time/games_count
+    for gametype in gametypes:
+        for i in range(1, games_count+1):
+            try:
+                gamename = gametype + "_" + str(size) + "_" + str(i) + ".gm"
+                gamepath = folder + "/" + gamename
+                cmd = ["../bin/benchmark", "-gp", "-" + solver, "''", gamepath, "-t", "1"]
+                out = subprocess.check_output(cmd, timeout=timeout).decode("utf-8")
+                time += float(out.split()[-2])
+                stats["solved"][gametype] += 1
+            except subprocess.TimeoutExpired:
+                stats["timeout"][gametype] += 1
+            except subprocess.CalledProcessError as exc:
+                print("Something went wrong, rc: ", exc.returncode, "output: ", exc.output)
+                exit(1)
+        stats["time"][gametype] = time/games_count
     
     return stats
 
-def save_stats(stats, size):
-    for solver in solvers:
-        for gametype in gametypes:
-            filename = solver + "_" + gametype + "_" + str(size) + "_stat.txt"
+def save_stats(solver, stats, size, folder):
+    for gametype in gametypes:
+        filename = solver + "_" + gametype + "_" + str(size) + "_stat.txt"
 
-            with open(filename, "w") as f:
-                f.write(str(stats[solver]["solved"][gametype]) + " "\
-                        + str(stats[solver]["timeout"][gametype]) + " "\
-                        + str(stats[solver]["time"][gametype]))
+        with open(folder + "/" + filename, "w") as f:
+            f.write(str(stats["solved"][gametype]) + " "\
+                    + str(stats["timeout"][gametype]) + " "\
+                    + str(stats["time"][gametype]))
 
 def main():
-    number, size = parse_args()
+    solver, number, size, timeout, folder = parse_args()
 
-    print("Evaluating algorithms for", number, "games of size", size)
-    stats = evaluate(number, size)
+    print("Evaluating solver", solver, "for", number, "games of size", size)
+    stats = evaluate(solver, number, size, timeout, folder)
 
     print("Done. Saving data")
-    save_stats(stats, size)
+    save_stats(solver, stats, size, folder)
     print("Done")
 
 if __name__ == "__main__":

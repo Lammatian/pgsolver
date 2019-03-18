@@ -6,10 +6,10 @@ import sys
 gametypes = ["random", "sparse", "steady"]
 
 def print_usage():
-    print("generate [name] [number] [size]")
+    print("generate [name] [number] [size] [folder]")
 
 def parse_args():
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 5:
         print_usage()
         exit(1)
 
@@ -34,10 +34,12 @@ def parse_args():
         print("size should be an integer")
         exit(1)
 
-    return (gametype, number, size)
+    folder = sys.argv[4]
 
-# generate the game and save to file
-def generate(gametype, size, idx):
+    return (gametype, number, size, folder)
+
+# generate the game and save to file in specific folder
+def generate(gametype, size, idx, folder):
     if gametype == "random":
         cmd = "../bin/randomgame "
         cmd += str(size) + " "
@@ -55,27 +57,30 @@ def generate(gametype, size, idx):
         cmd += "1 5 1 5"
 
     filename = gametype + "_" + str(size) + "_" + str(idx) + ".gm"
-    f = open(filename, "w")
+    f = open(folder + "/" + filename, "w")
 
     p = subprocess.call(cmd, shell=True, stdout=f)
     return p
 
 
 def main():
-    gametype, number, size = parse_args()
+    gametype, number, size, folder = parse_args()
+    print("Generating", number, "games of type", gametype, "and size", size)
 
     for i in range(1, number+1):
         if gametype == "all":
             for gt in gametypes:
-                rc = generate(gt, size, i) 
+                rc = generate(gt, size, i, folder)
                 if rc != 0:
                     print("error")
                     exit(1)
         else:
-            rc = generate(gametype, size, i) 
+            rc = generate(gametype, size, i, folder) 
             if rc != 0:
                 print("error")
                 exit(1)
+    
+    print("Done")
 
 if __name__ == "__main__":
     main()

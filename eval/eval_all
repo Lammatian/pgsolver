@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+
+import subprocess
+from datetime import datetime
+
+solvers = ["re", "si", "spm", "sp"]
+size_timeout = [
+   (50, 30),
+   (100, 60),
+   (200, 120),
+   (400, 240),
+   (600, 360),
+   (800, 480),
+   (1000, 600),
+#   (1500, 600),
+#   (3000, 600)
+]
+gamecount = 30
+
+now = datetime.now()
+folder = str(now.hour) + str(now.minute) + "_"\
+       + str(now.day) + "-"\
+       + str(now.month) + "-"\
+       + str(now.year)
+subprocess.call(["mkdir", folder])
+
+# generate all games
+for s, _ in size_timeout:
+    subprocess.call(["./generate", "all", str(gamecount), str(s), folder])
+
+# evaluate all solvers for all games
+for solver in solvers:
+    for s, t in size_timeout:
+        subprocess.call(["./eval", solver, str(gamecount), str(s), str(t), folder])
