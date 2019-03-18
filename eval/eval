@@ -3,49 +3,55 @@
 import subprocess
 import sys
 
+if len(sys.argv) < 3:
+    print("Usage: eval [number] [size]")
+    exit(1)
+
+games_count = int(sys.argv[1])
+size = int(sys.argv[2])
+
 gametypes = ["random", "sparse", "steady"]
 solvers = ["spm", "sp", "re", "si"]
-sizes = [10, 50, 100]
 
 stats = {}
 
 for solver in solvers:
     stats[solver] = {}
 
-    for size in sizes:
-        print(solver, size)
-        stats[solver][size] = {
-            "solved": {},
-            "timeout": {},
-            "time": {}
-        }
+    stats[solver] = {
+        "solved": {},
+        "timeout": {},
+        "time": {}
+    }
 
-        for gametype in gametypes:
-            stats[solver][size]["solved"][gametype] = 0
-            stats[solver][size]["timeout"][gametype] = 0
-            stats[solver][size]["time"][gametype] = 0.0
+    for gametype in gametypes:
+        stats[solver]["solved"][gametype] = 0
+        stats[solver]["timeout"][gametype] = 0
+        stats[solver]["time"][gametype] = 0.0
 
 for solver in solvers:
-    for size in sizes:
-        time = 0.0
-        games_count = 30
+    time = 0.0
 
-        for gametype in gametypes:
-            for i in range(1, games_count+1):
-                try:
-                    gamename = gametype + "_" + str(size) + "_" + str(i) + ".gm"
-                    cmd = ["../bin/benchmark", "-gp", "-" + solver, "''", gamename]
-                    out = subprocess.check_output(cmd, timeout=3).decode("utf-8")
-                    time += float(out.split()[-2])
-                    stats[solver][size]["solved"][gametype] += 1
-                except subprocess.TimeoutExpired:
-                    stats[solver][size]["timeout"][gametype] += 1
-                except subprocess.CalledProcessError as exc:
-                    print("Something went wrong, rc: ", exc.returncode, "output: ", exc.output)
-                    exit(1)
-            stats[solver][size]["time"][gametype] = time/games_count
+    for gametype in gametypes:
+        for i in range(1, games_count+1):
+            try:
+                gamename = gametype + "_" + str(size) + "_" + str(i) + ".gm"
+                cmd = ["../bin/benchmark", "-gp", "-" + solver, "''", gamename]
+                out = subprocess.check_output(cmd, timeout=3).decode("utf-8")
+                time += float(out.split()[-2])
+                stats[solver]["solved"][gametype] += 1
+            except subprocess.TimeoutExpired:
+                stats[solver]["timeout"][gametype] += 1
+            except subprocess.CalledProcessError as exc:
+                print("Something went wrong, rc: ", exc.returncode, "output: ", exc.output)
+                exit(1)
+        stats[solver]["time"][gametype] = time/games_count
 
 for solver in solvers:
-    for size in sizes:
-        for gametype in gametypes:
-            print(solver, size, gametype, stats[solver][size]["solved"][gametype], stats[solver][size]["timeout"][gametype], stats[solver][size]["time"][gametype])
+    for gametype in gametypes:
+        filename = solver + "_" + gametype + "_" + str(size) + "_stat.txt"
+
+        with open(filename, "w") as f:
+            f.write(str(stats[solver]["solved"][gametype]) + " "\
+                    + str(stats[solver]["timeout"][gametype]) + " "\
+                    + str(stats[solver]["time"][gametype]))
