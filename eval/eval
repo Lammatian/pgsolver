@@ -7,10 +7,10 @@ gametypes = ["random", "sparse", "steady"]
 solvers = ["spm", "sp", "re", "si"]
 
 def print_usage():
-    print("Usage: eval [solver] [number] [size] [timeout] [folder]")
+    print("Usage: eval [solver] [number] [size] [timeout] [source] [target]")
 
 def parse_args():
-    if len(sys.argv) < 6:
+    if len(sys.argv) < 7:
         print_usage()
         exit(1)
 
@@ -39,9 +39,10 @@ def parse_args():
         print_usage()
         exit(1)
 
-    folder = sys.argv[5]
+    source = sys.argv[5]
+    target = sys.argv[6]
 
-    return (solver, games_count, size, timeout, folder)
+    return (solver, games_count, size, timeout, source, target)
 
 def evaluate(solver, games_count, size, timeout, folder):
     stats = {}
@@ -56,6 +57,7 @@ def evaluate(solver, games_count, size, timeout, folder):
                 gamepath = folder + "/" + gamename
                 cmd = ["../bin/benchmark", "-gp", "-" + solver, "''", gamepath, "-t", "1"]
                 out = subprocess.check_output(cmd, timeout=timeout).decode("utf-8")
+                time = float(out.split()[-2])
                 stats[gametype].append(time)
             except subprocess.TimeoutExpired:
                 stats[gametype].append('timeout')
@@ -70,17 +72,17 @@ def save_stats(solver, stats, size, folder):
         filename = solver + "_" + gametype + "_" + str(size) + "_stat.txt"
 
         with open(folder + "/" + filename, "w") as f:
-            for result in solver[gametype]:
+            for result in stats[gametype]:
                 f.write(str(result) + "\n")
 
 def main():
-    solver, number, size, timeout, folder = parse_args()
+    solver, number, size, timeout, source, target = parse_args()
 
     print("Evaluating solver", solver, "for", number, "games of size", size)
-    stats = evaluate(solver, number, size, timeout, folder)
+    stats = evaluate(solver, number, size, timeout, source)
 
     print("Done. Saving data")
-    save_stats(solver, stats, size, folder)
+    save_stats(solver, stats, size, target)
     print("Done")
 
 if __name__ == "__main__":
