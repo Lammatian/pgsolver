@@ -45,18 +45,9 @@ def parse_args():
 
 def evaluate(solver, games_count, size, timeout, folder):
     stats = {}
-    stats = {
-        "solved": {},
-        "timeout": {},
-        "time": {}
-    }
 
     for gametype in gametypes:
-        stats["solved"][gametype] = 0
-        stats["timeout"][gametype] = 0
-        stats["time"][gametype] = 0.0
-
-    time = 0.0
+        stats[gametype] = []
 
     for gametype in gametypes:
         for i in range(1, games_count+1):
@@ -65,14 +56,12 @@ def evaluate(solver, games_count, size, timeout, folder):
                 gamepath = folder + "/" + gamename
                 cmd = ["../bin/benchmark", "-gp", "-" + solver, "''", gamepath, "-t", "1"]
                 out = subprocess.check_output(cmd, timeout=timeout).decode("utf-8")
-                time += float(out.split()[-2])
-                stats["solved"][gametype] += 1
+                stats[gametype].append(time)
             except subprocess.TimeoutExpired:
-                stats["timeout"][gametype] += 1
+                stats[gametype].append('timeout')
             except subprocess.CalledProcessError as exc:
                 print("Something went wrong, rc: ", exc.returncode, "output: ", exc.output)
                 exit(1)
-        stats["time"][gametype] = time/games_count
     
     return stats
 
@@ -81,9 +70,8 @@ def save_stats(solver, stats, size, folder):
         filename = solver + "_" + gametype + "_" + str(size) + "_stat.txt"
 
         with open(folder + "/" + filename, "w") as f:
-            f.write(str(stats["solved"][gametype]) + " "\
-                    + str(stats["timeout"][gametype]) + " "\
-                    + str(stats["time"][gametype]))
+            for result in solver[gametype]:
+                f.write(str(result) + "\n")
 
 def main():
     solver, number, size, timeout, folder = parse_args()
