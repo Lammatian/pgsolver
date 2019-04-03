@@ -78,8 +78,6 @@ module Converters = struct
             to make it of length s **)
         let len = !k - List.length l in
         let trailing_zeros = Array.make len 0 in
-        (** TODO: Is this reversing really necessary or
-            could we avoid that? **)
         let rev_list = List.rev l in
         Array.append (Array.of_list rev_list) trailing_zeros
       else
@@ -108,7 +106,6 @@ module RegisterGame = struct
   open Converters
   type t = Paritygame.paritygame
 
-  (** TODO: Check if priorities start from 0 **)
   let s = ref 0
   let k = ref 0
   let p = ref 0
@@ -194,7 +191,6 @@ module RegisterGame = struct
     let n = PG.ns_size nodes in
     k := clog2 n + 1;
     Converters.k := !k;
-    (** TODO: Check if this actually finds the max priority **)
     p := PG.pg_max_prio pg;
     Converters.p := !p;
     log_debug ("Max priority: " ^ string_of_int !p);
@@ -203,9 +199,9 @@ module RegisterGame = struct
     log_debug ("k: " ^ string_of_int !k);
     log_debug ("p: " ^ string_of_int !p);
     log_debug ("s: " ^ string_of_int !s);
-    (** TODO: Idea - mark with 'x' in description if a node has been
+    (** Idea - mark with 'x' in description if a node has been
         visited, to then easily remove nodes with in-degree 0 **)
-    (** TODO: Making separate HUGE arrays and then combining them
+    (** Making separate HUGE arrays and then combining them
         doesn't seem like the best idea, try to make one array **)
     log_debug "Creating non-reset nodes";
     let rg_nodes = Array.make (n * 2 * !s) (0, PG.plr_undef, [], None) in
@@ -359,5 +355,5 @@ let register () =
   Solverregistry.register_solver_factory
     (fun s -> parse s; solve)
     "registergame"
-    "rg" (** TODO: Make sure doesn't clash with anything **)
+    "rg"
     "Converter to an equivalent game with O(log n) bound on priorities but n^(log n) nodes"

@@ -45,9 +45,7 @@ module Converters : sig
   val desc_to_idx_reset : Paritygame.node -> int array -> int -> int
 
   (** A map from the index of a register game node to
-      the underlying node in the original game
-      
-      TODO: Describe the mapping here or below **)
+      the underlying node in the original game **)
   val idx_to_node : Paritygame.node -> int
 
   (** Recover the value of t (0 or 1) from the index **)
