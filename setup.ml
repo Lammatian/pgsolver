@@ -7093,6 +7093,8 @@ let setup_t =
                            "solvers/stratimpralgs/Switch_snare";
                            "solvers/stratimpralgs/Switch_zadeh";
                            "solvers/Succinctsmallprogress";
+                           "solvers/Sspm";
+                           "solvers/Registergame";
                            "paritygame/Generatorregistry";
                            "paritygame/Generators";
                            "generators/Randomgame";
